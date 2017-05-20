@@ -5,13 +5,13 @@ import (
 	"log"
 
 	"github.com/gonum/floats"
-	"github.com/kshedden/statmodel/dataprovider"
+	"github.com/kshedden/dstream/dstream"
 )
 
 type chunkMoment struct {
 
 	// The data used to perform the analysis
-	Data dataprovider.Reg
+	Data dstream.Reg
 
 	// Sample size, mean and covariance, separately by y level, but
 	// marginal over chunks.

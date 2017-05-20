@@ -6,10 +6,10 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/kshedden/statmodel/dataprovider"
+	"github.com/kshedden/dstream/dstream"
 )
 
-func docdat1(chunksize int) (dataprovider.Data, dataprovider.Reg) {
+func docdat1(chunksize int) (dstream.Dstream, dstream.Reg) {
 
 	n := 10000
 	p := 5
@@ -46,9 +46,9 @@ func docdat1(chunksize int) (dataprovider.Data, dataprovider.Reg) {
 	for j := 0; j < p; j++ {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
-	dp := dataprovider.NewFromArrays(ida, na)
-	dp = dataprovider.SizeChunk(dp, chunksize)
-	rdp := dataprovider.NewReg(dp, "y", na[1:6], "", "")
+	dp := dstream.NewFromArrays(ida, na)
+	dp = dstream.SizeChunk(dp, chunksize)
+	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp
 }
@@ -71,7 +71,7 @@ func TestDOC1(t *testing.T) {
 	_ = doc
 }
 
-func docdat2(chunksize int) (dataprovider.Data, dataprovider.Reg) {
+func docdat2(chunksize int) (dstream.Dstream, dstream.Reg) {
 
 	n := 10000
 	p := 5
@@ -110,9 +110,9 @@ func docdat2(chunksize int) (dataprovider.Data, dataprovider.Reg) {
 	for j := 0; j < p; j++ {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
-	dp := dataprovider.NewFromArrays(ida, na)
-	dp = dataprovider.SizeChunk(dp, chunksize)
-	rdp := dataprovider.NewReg(dp, "y", na[1:6], "", "")
+	dp := dstream.NewFromArrays(ida, na)
+	dp = dstream.SizeChunk(dp, chunksize)
+	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp
 }
@@ -137,7 +137,7 @@ func TestDOC2(t *testing.T) {
 
 // Generate data from a forward regression model.  X marginally is AR,
 // Y|X depends only on one linear function of X.
-func docdat3(chunksize int) (dataprovider.Data, dataprovider.Reg) {
+func docdat3(chunksize int) (dstream.Dstream, dstream.Reg) {
 
 	n := 10000
 	p := 5
@@ -175,9 +175,9 @@ func docdat3(chunksize int) (dataprovider.Data, dataprovider.Reg) {
 	for j := 0; j < p; j++ {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
-	dp := dataprovider.NewFromArrays(ida, na)
-	dp = dataprovider.SizeChunk(dp, chunksize)
-	rdp := dataprovider.NewReg(dp, "y", na[1:6], "", "")
+	dp := dstream.NewFromArrays(ida, na)
+	dp = dstream.SizeChunk(dp, chunksize)
+	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp
 }

@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/gonum/floats"
-	"github.com/kshedden/statmodel/dataprovider"
+	"github.com/kshedden/dstream/dstream"
 )
 
-func cmdat1(chunksize int) (dataprovider.Data, dataprovider.Reg) {
+func cmdat1(chunksize int) (dstream.Dstream, dstream.Reg) {
 
 	n := 100
 	p := 3
@@ -58,11 +58,11 @@ func cmdat1(chunksize int) (dataprovider.Data, dataprovider.Reg) {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
 	na = append(na, "seg")
-	dp := dataprovider.NewFromArrays(ida, na)
-	dp = dataprovider.Segment(dp, []string{"seg"})
-	dp = dataprovider.Drop(dp, []string{"seg"})
+	dp := dstream.NewFromArrays(ida, na)
+	dp = dstream.Segment(dp, []string{"seg"})
+	dp = dstream.Drop(dp, []string{"seg"})
 	na = dp.Names()
-	rdp := dataprovider.NewReg(dp, "y", na[1:len(na)], "", "")
+	rdp := dstream.NewReg(dp, "y", na[1:len(na)], "", "")
 
 	return dp, rdp
 }
@@ -77,7 +77,7 @@ func TestCM1(t *testing.T) {
 			panic(err)
 		}
 		wtr := bufio.NewWriter(fid)
-		dataprovider.ToCSV(rdp, wtr)
+		dstream.ToCSV(rdp, wtr)
 		wtr.Flush()
 		fid.Close()
 	}

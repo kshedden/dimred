@@ -11,7 +11,7 @@ import (
 	"github.com/gonum/blas/blas64"
 	"github.com/gonum/floats"
 	"github.com/gonum/matrix/mat64"
-	"github.com/kshedden/statmodel/dataprovider"
+	"github.com/kshedden/dstream/dstream"
 )
 
 // SliceFunc returns the slice index for a data record
@@ -20,7 +20,7 @@ type SliceFunc func(float64) int
 type SIR struct {
 
 	// The data used to perform the analysis
-	Data dataprovider.Reg
+	Data dstream.Reg
 
 	// A function returning the slice index of each response value
 	Slicer SliceFunc

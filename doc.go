@@ -8,7 +8,7 @@ import (
 
 	"github.com/gonum/floats"
 	"github.com/gonum/matrix/mat64"
-	"github.com/kshedden/statmodel/dataprovider"
+	"github.com/kshedden/dstream/dstream"
 )
 
 type DOC struct {
@@ -41,7 +41,7 @@ func (doc *DOC) MeanDir() []float64 {
 	return doc.meandir
 }
 
-func NewDOC(data dataprovider.Reg) *DOC {
+func NewDOC(data dstream.Reg) *DOC {
 
 	d := &DOC{
 		chunkMoment: chunkMoment{

@@ -8,7 +8,7 @@ import (
 
 	"github.com/gonum/floats"
 	"github.com/gonum/matrix/mat64"
-	"github.com/kshedden/statmodel/dataprovider"
+	"github.com/kshedden/dstream/dstream"
 )
 
 func armat(d int, r float64) mat64.Symmetric {
@@ -24,7 +24,7 @@ func armat(d int, r float64) mat64.Symmetric {
 	return mat64.NewSymDense(d, c)
 }
 
-func gendat1(chunksize int) (dataprovider.Data, dataprovider.Reg) {
+func gendat1(chunksize int) (dstream.Dstream, dstream.Reg) {
 
 	n := 10000
 	p := 5
@@ -65,9 +65,9 @@ func gendat1(chunksize int) (dataprovider.Data, dataprovider.Reg) {
 	for j := 0; j < p; j++ {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
-	dp := dataprovider.NewFromArrays(ida, na)
-	dp = dataprovider.SizeChunk(dp, chunksize)
-	rdp := dataprovider.NewReg(dp, "y", na[1:6], "", "")
+	dp := dstream.NewFromArrays(ida, na)
+	dp = dstream.SizeChunk(dp, chunksize)
+	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp
 }
@@ -123,7 +123,7 @@ func TestSIR1(t *testing.T) {
 	}
 }
 
-func gendat2(chunksize int) (dataprovider.Data, dataprovider.Reg) {
+func gendat2(chunksize int) (dstream.Dstream, dstream.Reg) {
 
 	n := 10000
 	p := 5
@@ -160,9 +160,9 @@ func gendat2(chunksize int) (dataprovider.Data, dataprovider.Reg) {
 	for j := 0; j < p; j++ {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
-	dp := dataprovider.NewFromArrays(ida, na)
-	dp = dataprovider.SizeChunk(dp, chunksize)
-	rdp := dataprovider.NewReg(dp, "y", na[1:6], "", "")
+	dp := dstream.NewFromArrays(ida, na)
+	dp = dstream.SizeChunk(dp, chunksize)
+	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp
 }
@@ -205,7 +205,7 @@ func TestSIR2(t *testing.T) {
 	}
 }
 
-func gendat3(chunksize int) (dataprovider.Data, dataprovider.Reg) {
+func gendat3(chunksize int) (dstream.Dstream, dstream.Reg) {
 
 	n := 10000
 	p := 5
@@ -248,9 +248,9 @@ func gendat3(chunksize int) (dataprovider.Data, dataprovider.Reg) {
 	for j := 0; j < p; j++ {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
-	dp := dataprovider.NewFromArrays(ida, na)
-	dp = dataprovider.SizeChunk(dp, chunksize)
-	rdp := dataprovider.NewReg(dp, "y", na[1:6], "", "")
+	dp := dstream.NewFromArrays(ida, na)
+	dp = dstream.SizeChunk(dp, chunksize)
+	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp
 }
@@ -274,6 +274,4 @@ func TestSIR3(t *testing.T) {
 	sir.Init()
 	sir.ProjectEigen(4)
 	sir.Fit()
-
-	fmt.Printf("%v\n", sir.Dir[0])
 }
