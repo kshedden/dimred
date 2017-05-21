@@ -61,7 +61,7 @@ func (doc *DOC) Init() {
 
 func (doc *DOC) Fit(ndir int) {
 
-	p := doc.Data.NCov()
+	p := doc.Data.NumCov()
 	pp := p * p
 
 	margcov := mat64.NewSymDense(p, doc.margcov)

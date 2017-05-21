@@ -90,7 +90,7 @@ func reflect(x []float64, p int) {
 func (sir *SIR) getstats() {
 
 	sir.Data.Reset()
-	p := sir.Data.NCov()
+	p := sir.Data.NumCov()
 	pp := p * p
 
 	var sl []int // slice indices for current chunk
@@ -175,7 +175,7 @@ func (sir *SIR) SliceMeans() [][]float64 {
 // marg pools over the chunks to obtain the marginal mean and covariance
 func (sir *SIR) marg() {
 
-	p := sir.Data.NCov()
+	p := sir.Data.NumCov()
 	pp := p * p
 
 	// Get the marginal mean
@@ -221,7 +221,7 @@ func (sir *SIR) marg() {
 // means.
 func (sir *SIR) getccmn() {
 
-	p := sir.Data.NCov()
+	p := sir.Data.NumCov()
 	pp := p * p
 	mn := sir.mn
 	ccmn := make([]float64, pp)
@@ -263,7 +263,7 @@ func (sir *SIR) Init() {
 	sir.getccmn()
 	sir.doneInit = true
 	if sir.log != nil {
-		sir.log.Printf("%d variables\n", sir.Data.NCov())
+		sir.log.Printf("%d variables\n", sir.Data.NumCov())
 		sir.log.Printf("%d data records used\n", sir.n)
 		sir.log.Printf("%d chunks read\n", sir.nchunk)
 		sir.log.Printf("%d data records with negative slice index skipped\n", sir.nskip)
@@ -324,7 +324,7 @@ func conjugate(a mat64.Symmetric, b mat64.Matrix) mat64.Symmetric {
 // the marginal covariance matrix.
 func (sir *SIR) ProjectEigen(ndim int) {
 
-	p := sir.Data.NCov()
+	p := sir.Data.NumCov()
 	mcov := sir.mcov
 
 	es := new(mat64.EigenSym)
@@ -355,7 +355,7 @@ func (sir *SIR) Fit() {
 		sir.Init()
 	}
 
-	p := sir.Data.NCov()
+	p := sir.Data.NumCov()
 	mcov := sir.mcov
 	ccmn := sir.ccmn
 
@@ -414,7 +414,7 @@ func (sir *SIR) Fit() {
 
 	// If needed, convert to original basis
 	if sir.projBasis != nil {
-		p := sir.Data.NCov()
+		p := sir.Data.NumCov()
 		for j := 0; j < ndir; j++ {
 			b := make([]float64, p)
 			v := mat64.NewVector(p, b)

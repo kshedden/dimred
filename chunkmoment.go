@@ -64,7 +64,7 @@ func zero(x [][]float64) [][]float64 {
 // current value of cov (everything stratified by y level).
 func (cm *chunkMoment) addBetweenCov() {
 
-	p := cm.Data.NCov()
+	p := cm.Data.NumCov()
 	pp := p * p
 	wk := make([]float64, pp)
 
@@ -100,7 +100,7 @@ func (cm *chunkMoment) addBetweenCov() {
 // chunkMean calculates the means of the current chunk's data,
 // stratifying by y-level.
 func (cm *chunkMoment) chunkMean() ([][]float64, []int) {
-	p := cm.Data.NCov()
+	p := cm.Data.NumCov()
 	y := cm.Data.YData()
 	var mn [][]float64
 	var ny []int
@@ -134,7 +134,7 @@ func (cm *chunkMoment) chunkMean() ([][]float64, []int) {
 // chunkCov calculates the covariances of the current chunk's data,
 // stratifying by y-level.  The provided storage is used if possible.
 func (cm *chunkMoment) chunkCov(cov [][]float64, mn [][]float64, ny []int) [][]float64 {
-	p := cm.Data.NCov()
+	p := cm.Data.NumCov()
 	pp := p * p
 	cov = zero(cov)
 	y := cm.Data.YData()
@@ -179,7 +179,7 @@ func (cm *chunkMoment) walk() {
 	cm.chunkmeans = cm.chunkmeans[0:0]
 	cm.ny = cm.ny[0:0]
 
-	p := cm.Data.NCov()
+	p := cm.Data.NumCov()
 	pp := p * p
 	var cov [][]float64 // stack of p^2 dimensional workspaces
 
@@ -257,7 +257,7 @@ func (cm *chunkMoment) walk() {
 // getMargMean collapses over the y levels to get the marginal mean
 func (cm *chunkMoment) getMargMean() {
 
-	p := cm.Data.NCov()
+	p := cm.Data.NumCov()
 	margmean := make([]float64, p)
 
 	for yi, v := range cm.mean {
@@ -281,7 +281,7 @@ func (cm *chunkMoment) getMargCov() {
 		cm.getMargMean()
 	}
 
-	p := cm.Data.NCov()
+	p := cm.Data.NumCov()
 	pp := p * p
 
 	// Mean within-y covariance
