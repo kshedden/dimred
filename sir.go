@@ -388,7 +388,7 @@ func (sir *SIR) Fit() {
 	// q3 is a symmetric matrix but not of type Symmetric, would
 	// be better to use EigenSym here but hard to convert.
 	var ei mat64.Eigen
-	ok := ei.Factorize(q3, true)
+	ok := ei.Factorize(q3, false, true)
 	if !ok {
 		panic("Can't factorize covariance of means matrix\n")
 	}
