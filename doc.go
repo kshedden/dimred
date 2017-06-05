@@ -74,16 +74,14 @@ func (doc *DOC) Fit(ndir int) {
 	// Calculate the standardized difference between the group
 	// means, which is also the dimension reduction direction (in
 	// the original coordinates) based on the mean.
-	md := make([]float64, p)
-	floats.SubTo(md, doc.mean[0], doc.mean[1])
-	v := mat64.NewVector(p, md)
-	meandir := make([]float64, p)
-	u := mat64.NewVector(p, meandir)
-	err := u.SolveCholeskyVec(msr, v)
+	// TODO: what is the right standardization to use here?
+	doc.meandir = make([]float64, p)
+	floats.SubTo(doc.meandir, doc.mean[0], doc.mean[1])
+	v := mat64.NewVector(p, doc.meandir)
+	err := v.SolveVec(margcov, v)
 	if err != nil {
 		panic(err)
 	}
-	doc.meandir = meandir
 	if doc.log != nil {
 		doc.log.Printf("Mean-based dimension reduction direction/standardized mean difference:")
 		doc.log.Printf("%v", doc.meandir)
@@ -146,11 +144,11 @@ func (doc *DOC) Fit(ndir int) {
 	qm.LFromCholesky(msr)
 	for j, v := range doc.stcovdirs {
 		doc.covdirs[j] = make([]float64, p)
-		u = mat64.NewVector(p, doc.covdirs[j])
+		u := mat64.NewVector(p, doc.covdirs[j])
 		w := mat64.NewVector(p, v)
 		err = u.SolveVec(qm.T(), w)
 		if err != nil {
-			print("can't back-transform covaraiance directions")
+			print("can't back-transform covariance directions")
 		}
 	}
 	if doc.log != nil {
