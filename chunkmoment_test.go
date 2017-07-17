@@ -60,7 +60,7 @@ func cmdat1(chunksize int) (dstream.Dstream, dstream.Reg) {
 	na = append(na, "seg")
 	dp := dstream.NewFromArrays(ida, na)
 	dp = dstream.Segment(dp, []string{"seg"})
-	dp = dstream.Drop(dp, []string{"seg"})
+	dp = dstream.DropCols(dp, []string{"seg"})
 	na = dp.Names()
 	rdp := dstream.NewReg(dp, "y", na[1:len(na)], "", "")
 
@@ -107,7 +107,7 @@ func TestCM1(t *testing.T) {
 	}
 
 	// Check marginal mean
-	cm.getMargMean()
+	cm.calcMargMean()
 	mn := cm.MargMean()
 	emn := []float64{-0.109787, 0.031292, -0.034271}
 	if !floats.EqualApprox(mn, emn, 0.001) {
@@ -127,7 +127,7 @@ func TestCM1(t *testing.T) {
 	}
 
 	// Check marginal covariance
-	cm.getMargCov()
+	cm.calcMargCov()
 	mc := cm.MargCov()
 	emc := []float64{1.21597913, 0.69747121, 0.64119799, 0.69747121, 0.93473454, 0.70314174,
 		0.64119799, 0.70314174, 1.0095865}

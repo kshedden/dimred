@@ -55,16 +55,16 @@ func NewDOC(data dstream.Reg) *DOC {
 func (doc *DOC) Init() {
 
 	doc.walk()
-	doc.getMargMean()
-	doc.getMargCov()
+	doc.calcMargMean()
+	doc.calcMargCov()
 }
 
 func (doc *DOC) Fit(ndir int) {
 
-	p := doc.Data.NumCov()
+	p := doc.Dim()
 	pp := p * p
 
-	margcov := mat64.NewSymDense(p, doc.margcov)
+	margcov := mat64.NewSymDense(p, doc.GetMargCov())
 	msr := new(mat64.Cholesky)
 	if ok := msr.Factorize(margcov); !ok {
 		print("Can't factorize marginal covariance")
@@ -76,7 +76,7 @@ func (doc *DOC) Fit(ndir int) {
 	// the original coordinates) based on the mean.
 	// TODO: what is the right standardization to use here?
 	doc.meandir = make([]float64, p)
-	floats.SubTo(doc.meandir, doc.mean[0], doc.mean[1])
+	floats.SubTo(doc.meandir, doc.GetMean(0), doc.GetMean(1))
 	v := mat64.NewVector(p, doc.meandir)
 	err := v.SolveVec(margcov, v)
 	if err != nil {
@@ -90,7 +90,7 @@ func (doc *DOC) Fit(ndir int) {
 	// Caculate the standardized difference between the group
 	// covariances.
 	cd := make([]float64, pp)
-	floats.SubTo(cd, doc.cov[0], doc.cov[1])
+	floats.SubTo(cd, doc.GetCov(0), doc.GetCov(1))
 	cdm := mat64.NewSymDense(p, cd)
 	q1 := new(mat64.TriDense)
 	q1.LFromCholesky(msr)
@@ -107,7 +107,7 @@ func (doc *DOC) Fit(ndir int) {
 		doc.log.Printf(fmt.Sprintf("%v", doc.stcovdiff))
 	}
 
-	// Calculate the eignevectors of the standardized covariance
+	// Calculate the eigenvectors of the standardized covariance
 	// difference
 	es := new(mat64.EigenSym)
 	m1 := mat64.NewSymDense(p, doc.stcovdiff)
