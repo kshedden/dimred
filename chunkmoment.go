@@ -61,7 +61,7 @@ func (cm *chunkMoment) YMean(y int) []float64 {
 // setProjection uses the dominant eigenvectors of the marginal
 // covariance matrix to project all calculated moments to a reduced
 // space.
-func (cm *chunkMoment) setProjection(ndim int) {
+func (cm *chunkMoment) doProjection(ndim int) {
 
 	// Restores the original full covariances.
 	if ndim == 0 {
@@ -81,7 +81,7 @@ func (cm *chunkMoment) setProjection(ndim int) {
 	evec := new(mat64.Dense)
 	evec.EigenvectorsSym(es)
 	if cm.log != nil {
-		cm.log.Printf("Eigenvalues of marginal covariance:")
+		cm.log.Printf("Eigenvalues of marginal covariance for projection:")
 		cm.log.Printf(fmt.Sprintf("%v\n", es.Values(nil)))
 		cm.log.Printf(fmt.Sprintf("Retaining %d-dimensional eigenspace, dropping %d dimensions\n", ndim, p-ndim))
 	}
@@ -89,9 +89,6 @@ func (cm *chunkMoment) setProjection(ndim int) {
 
 	cm.projBasis = evecv
 	cm.projDim = ndim
-
-	// DEBUG
-	fmt.Printf("%v\n", mat64.Formatted(evecv, mat64.Prefix(" ")))
 }
 
 // zero an array
@@ -270,7 +267,7 @@ func (cm *chunkMoment) project(vec []float64) []float64 {
 	mp := make([]float64, p)
 
 	// Do the projection
-	r := new(mat64.Vector)
+	r := mat64.NewVector(p, mp)
 	r.MulVec(cm.projBasis.T(), mat64.NewVector(q, vec))
 
 	return mp

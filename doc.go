@@ -31,6 +31,8 @@ type DOC struct {
 	// The standardized difference between the covariance matrices
 	// for Y=1 and Y=0.
 	stcovdiff []float64
+
+	projDim int
 }
 
 // CovDir returns an estimated dimension reduction direction derived
@@ -74,13 +76,17 @@ func (doc *DOC) Done() *DOC {
 }
 
 func (doc *DOC) SetProjection(ndim int) *DOC {
-	doc.setProjection(ndim)
+	doc.projDim = ndim
 	return doc
 }
 
 func (doc *DOC) Fit(ndir int) {
 
 	p := doc.Dim()
+	if doc.projDim != 0 {
+		doc.doProjection(doc.projDim)
+		p = doc.projDim
+	}
 	pp := p * p
 
 	margcov := mat64.NewSymDense(p, doc.GetMargCov())
