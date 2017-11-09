@@ -17,13 +17,15 @@ func docdat1(chunksize int) (dstream.Dstream, dstream.Reg) {
 	rc := math.Sqrt(1 - r*r)
 	da := make([][]float64, p+1)
 
-	// Noise
+	// Autocorrelated noise
 	for j := 0; j < p+1; j++ {
 		if j == 0 {
+			// First variable is all white
 			for i := 0; i < n; i++ {
 				da[j] = append(da[j], rand.NormFloat64())
 			}
 		} else {
+			// Subsequent variables are autocorrelated with previous variables
 			for i := 0; i < n; i++ {
 				da[j] = append(da[j], r*da[j-1][i]+rc*rand.NormFloat64())
 			}
@@ -47,7 +49,7 @@ func docdat1(chunksize int) (dstream.Dstream, dstream.Reg) {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
 	dp := dstream.NewFromArrays(ida, na)
-	dp = dstream.SizeChunk(dp, chunksize)
+	dp = dstream.MaxChunkSize(dp, chunksize)
 	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp
@@ -55,20 +57,12 @@ func docdat1(chunksize int) (dstream.Dstream, dstream.Reg) {
 
 func TestDOC1(t *testing.T) {
 
-	dp, rdp := docdat1(1000)
-	_ = dp
+	_, rdp := docdat1(1000)
 
-	doc := &DOC{
-		chunkMoment: chunkMoment{
-			Data: rdp,
-		},
-	}
-
-	doc.SetLogFile("ss")
-	doc.Init()
+	doc := NewDOC(rdp).SetLogFile("ss").Done()
 	doc.Fit(4)
 
-	_ = doc
+	_ = doc // just a smoke test
 }
 
 func docdat2(chunksize int) (dstream.Dstream, dstream.Reg) {
@@ -111,7 +105,7 @@ func docdat2(chunksize int) (dstream.Dstream, dstream.Reg) {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
 	dp := dstream.NewFromArrays(ida, na)
-	dp = dstream.SizeChunk(dp, chunksize)
+	dp = dstream.MaxChunkSize(dp, chunksize)
 	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp
@@ -119,20 +113,12 @@ func docdat2(chunksize int) (dstream.Dstream, dstream.Reg) {
 
 func TestDOC2(t *testing.T) {
 
-	dp, rdp := docdat2(1000)
-	_ = dp
+	_, rdp := docdat2(1000)
 
-	doc := &DOC{
-		chunkMoment: chunkMoment{
-			Data: rdp,
-		},
-	}
-
-	doc.SetLogFile("s2")
-	doc.Init()
+	doc := NewDOC(rdp).SetLogFile("s2").Done()
 	doc.Fit(4)
 
-	_ = doc
+	_ = doc // Just a smoke test
 }
 
 // Generate data from a forward regression model.  X marginally is AR,
@@ -176,7 +162,7 @@ func docdat3(chunksize int) (dstream.Dstream, dstream.Reg) {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
 	dp := dstream.NewFromArrays(ida, na)
-	dp = dstream.SizeChunk(dp, chunksize)
+	dp = dstream.MaxChunkSize(dp, chunksize)
 	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp
@@ -184,18 +170,10 @@ func docdat3(chunksize int) (dstream.Dstream, dstream.Reg) {
 
 func TestDOC3(t *testing.T) {
 
-	dp, rdp := docdat3(1000)
-	_ = dp
+	_, rdp := docdat3(1000)
 
-	doc := &DOC{
-		chunkMoment: chunkMoment{
-			Data: rdp,
-		},
-	}
-
-	doc.SetLogFile("s3")
-	doc.Init()
+	doc := NewDOC(rdp).SetLogFile("s3").Done()
 	doc.Fit(2)
 
-	_ = doc
+	_ = doc // Just a smoke test
 }
