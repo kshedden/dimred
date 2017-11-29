@@ -66,7 +66,7 @@ func gendat1(chunksize int) (dstream.Dstream, dstream.Reg) {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
 	dp := dstream.NewFromArrays(ida, na)
-	dp = dstream.SizeChunk(dp, chunksize)
+	dp = dstream.MaxChunkSize(dp, chunksize)
 	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp
@@ -161,7 +161,7 @@ func gendat2(chunksize int) (dstream.Dstream, dstream.Reg) {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
 	dp := dstream.NewFromArrays(ida, na)
-	dp = dstream.SizeChunk(dp, chunksize)
+	dp = dstream.MaxChunkSize(dp, chunksize)
 	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp
@@ -249,7 +249,7 @@ func gendat3(chunksize int) (dstream.Dstream, dstream.Reg) {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
 	dp := dstream.NewFromArrays(ida, na)
-	dp = dstream.SizeChunk(dp, chunksize)
+	dp = dstream.MaxChunkSize(dp, chunksize)
 	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp

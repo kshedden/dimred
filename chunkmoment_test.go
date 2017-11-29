@@ -77,7 +77,7 @@ func TestCM1(t *testing.T) {
 			panic(err)
 		}
 		wtr := bufio.NewWriter(fid)
-		dstream.ToCSV(rdp, wtr)
+		dstream.ToCSV(rdp).SetWriter(wtr).Done()
 		wtr.Flush()
 		fid.Close()
 	}

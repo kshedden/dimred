@@ -58,10 +58,10 @@ func (cm *chunkMoment) YMean(y int) []float64 {
 	return cm.mean[y]
 }
 
-// SetProjection uses the dominant eigenvectors of the marginal
+// setProjection uses the dominant eigenvectors of the marginal
 // covariance matrix to project all calculated moments to a reduced
 // space.
-func (cm *chunkMoment) SetProjection(ndim int) {
+func (cm *chunkMoment) doProjection(ndim int) {
 
 	// Restores the original full covariances.
 	if ndim == 0 {
@@ -81,7 +81,7 @@ func (cm *chunkMoment) SetProjection(ndim int) {
 	evec := new(mat64.Dense)
 	evec.EigenvectorsSym(es)
 	if cm.log != nil {
-		cm.log.Printf("Eigenvalues of marginal covariance:")
+		cm.log.Printf("Eigenvalues of marginal covariance for projection:")
 		cm.log.Printf(fmt.Sprintf("%v\n", es.Values(nil)))
 		cm.log.Printf(fmt.Sprintf("Retaining %d-dimensional eigenspace, dropping %d dimensions\n", ndim, p-ndim))
 	}
@@ -267,10 +267,24 @@ func (cm *chunkMoment) project(vec []float64) []float64 {
 	mp := make([]float64, p)
 
 	// Do the projection
-	r := new(mat64.Vector)
+	r := mat64.NewVector(p, mp)
 	r.MulVec(cm.projBasis.T(), mat64.NewVector(q, vec))
 
 	return mp
+}
+
+// invproject inverts the stored projection, mapping the vector vec
+// back to the original coordinate system.
+func (cm *chunkMoment) invproject(vec []float64) []float64 {
+
+	q := cm.Data.NumCov() // Original dimension
+	p := cm.projDim       // New dimension
+
+	u := make([]float64, q)
+	r := mat64.NewVector(q, u)
+	r.MulVec(cm.projBasis, mat64.NewVector(p, vec))
+
+	return u
 }
 
 // GetMean returns the conditional mean for y=i.  If a projection has
@@ -292,18 +306,7 @@ func (cm *chunkMoment) GetCov(i int) []float64 {
 		return cm.cov[i]
 	}
 
-	return cm.project(cm.cov[i])
-}
-
-// Returns the marginal covariance, possibly projected if a projection
-// has been set.
-func (cm *chunkMoment) GetMargCov() []float64 {
-
-	if cm.projDim == 0 {
-		return cm.margcov
-	}
-
-	return cm.conjugate(cm.margcov)
+	return cm.conjugate(cm.cov[i])
 }
 
 // Returns the marginal mean, possibly projected if a projection
@@ -315,6 +318,17 @@ func (cm *chunkMoment) GetMargMean() []float64 {
 	}
 
 	return cm.project(cm.margmean)
+}
+
+// Returns the marginal covariance, possibly projected if a projection
+// has been set.
+func (cm *chunkMoment) GetMargCov() []float64 {
+
+	if cm.projDim == 0 {
+		return cm.margcov
+	}
+
+	return cm.conjugate(cm.margcov)
 }
 
 // walk cycles through the data and calculates chunk-wise summary

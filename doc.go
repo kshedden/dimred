@@ -19,7 +19,7 @@ type DOC struct {
 	// and Y=0.
 	meandir []float64
 
-	// The dimensiona redution directions obtained from the covariances
+	// The dimension redution directions obtained from the covariances
 	covdirs [][]float64
 
 	// The standardized dimension reduction directions for the covariance difference
@@ -31,14 +31,30 @@ type DOC struct {
 	// The standardized difference between the covariance matrices
 	// for Y=1 and Y=0.
 	stcovdiff []float64
+
+	projDim int
 }
 
+// CovDir returns an estimated dimension reduction direction derived
+// from the covariances.
 func (doc *DOC) CovDir(j int) []float64 {
-	return doc.covdirs[j]
+
+	if doc.projDim == 0 {
+		return doc.covdirs[j]
+	}
+
+	return doc.invproject(doc.covdirs[j])
 }
 
+// MeanDir returns the estimated dimension reduction direction derived
+// from the means.
 func (doc *DOC) MeanDir() []float64 {
-	return doc.meandir
+
+	if doc.projDim == 0 {
+		return doc.meandir
+	}
+
+	return doc.invproject(doc.meandir)
 }
 
 func NewDOC(data dstream.Reg) *DOC {
@@ -52,16 +68,25 @@ func NewDOC(data dstream.Reg) *DOC {
 	return d
 }
 
-func (doc *DOC) Init() {
-
+func (doc *DOC) Done() *DOC {
 	doc.walk()
 	doc.calcMargMean()
 	doc.calcMargCov()
+	return doc
+}
+
+func (doc *DOC) SetProjection(ndim int) *DOC {
+	doc.projDim = ndim
+	return doc
 }
 
 func (doc *DOC) Fit(ndir int) {
 
 	p := doc.Dim()
+	if doc.projDim != 0 {
+		doc.doProjection(doc.projDim)
+		p = doc.projDim
+	}
 	pp := p * p
 
 	margcov := mat64.NewSymDense(p, doc.GetMargCov())
@@ -157,10 +182,12 @@ func (doc *DOC) Fit(ndir int) {
 	}
 }
 
-func (doc *DOC) SetLogFile(filename string) {
+func (doc *DOC) SetLogFile(filename string) *DOC {
 	fid, err := os.Create(filename)
 	if err != nil {
 		panic(err)
 	}
 	doc.log = log.New(fid, "", log.Lshortfile)
+
+	return doc
 }

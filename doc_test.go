@@ -9,35 +9,62 @@ import (
 	"github.com/brookluers/dstream/dstream"
 )
 
-func docdat1(chunksize int) (dstream.Dstream, dstream.Reg) {
+// arspec specifies a test population for simulation.  The
+// observations alternate between the two groups.
+type arspec struct {
 
-	n := 10000
-	p := 5
-	r := 0.6
+	// Sample size
+	n int
+
+	// Number of variables
+	p int
+
+	// Autocorrelation parameter
+	r float64
+
+	// Transformation function that can be used to introduce a
+	// mean. The arguments are i (subject), j (variable) and e,
+	// where e is the AR-1 error term.
+	xform func(int, int, float64) float64
+}
+
+func docdat1(chunksize int, ars arspec) (dstream.Dstream, dstream.Reg) {
+
+	n := ars.n
+	p := ars.p
+	r := ars.r
 	rc := math.Sqrt(1 - r*r)
-	da := make([][]float64, p+1)
+	da := make([][]float64, p+1) // first element is group label 0/1
 
-	// Noise
+	// Autocorrelated noise
 	for j := 0; j < p+1; j++ {
 		if j == 0 {
+			// First variable is all white
 			for i := 0; i < n; i++ {
 				da[j] = append(da[j], rand.NormFloat64())
 			}
 		} else {
+			// Subsequent variables are correlated with previous variables
 			for i := 0; i < n; i++ {
 				da[j] = append(da[j], r*da[j-1][i]+rc*rand.NormFloat64())
 			}
 		}
 	}
-
-	// Signal
-	for i := 0; i < n; i++ {
-		da[0][i] = float64(i % 2)
-		for j := 1; j < p+1; j++ {
-			da[j][i] = float64(i%2)*float64(j) + float64(i%2+1)*da[j][i]
+	// Mean structure
+	if ars.xform != nil {
+		for i := 0; i < n; i++ {
+			for j := 1; j < p+1; j++ {
+				da[j][i] = ars.xform(i, j, da[j][i])
+			}
 		}
 	}
 
+	// Create the group labels
+	for i := 0; i < n; i++ {
+		da[0][i] = float64(i % 2)
+	}
+
+	// Create a dstream
 	var ida [][]interface{}
 	for _, x := range da {
 		ida = append(ida, []interface{}{x})
@@ -47,7 +74,7 @@ func docdat1(chunksize int) (dstream.Dstream, dstream.Reg) {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
 	dp := dstream.NewFromArrays(ida, na)
-	dp = dstream.SizeChunk(dp, chunksize)
+	dp = dstream.MaxChunkSize(dp, chunksize)
 	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp
@@ -55,84 +82,36 @@ func docdat1(chunksize int) (dstream.Dstream, dstream.Reg) {
 
 func TestDOC1(t *testing.T) {
 
-	dp, rdp := docdat1(1000)
-	_ = dp
-
-	doc := &DOC{
-		chunkMoment: chunkMoment{
-			Data: rdp,
-		},
+	xform := func(i int, j int, x float64) float64 {
+		if j == 0 {
+			return float64(i % 2)
+		}
+		z := float64(i%2)*float64(j) + float64(i%2+1)*x
+		if i%2 == 0 {
+			z *= 2
+		}
+		return z
 	}
 
-	doc.SetLogFile("ss")
-	doc.Init()
+	ars := arspec{n: 10000, p: 5, r: 0.6, xform: xform}
+
+	_, rdp := docdat1(1000, ars)
+
+	doc := NewDOC(rdp).SetLogFile("ss").Done()
 	doc.Fit(4)
 
-	_ = doc
-}
-
-func docdat2(chunksize int) (dstream.Dstream, dstream.Reg) {
-
-	n := 10000
-	p := 5
-	r := 0.6
-	rc := math.Sqrt(1 - r*r)
-	da := make([][]float64, p+1)
-
-	// AR noise
-	for j := 0; j < p+1; j++ {
-		if j == 0 || j == 3 {
-			for i := 0; i < n; i++ {
-				da[j] = append(da[j], rand.NormFloat64())
-			}
-		} else {
-			for i := 0; i < n; i++ {
-				da[j] = append(da[j], r*da[j-1][i]+rc*rand.NormFloat64())
-			}
-		}
-	}
-
-	for i := 0; i < n; i++ {
-		da[0][i] = float64(i % 2)
-
-		// Covariance difference in two coordinates
-		if i%2 == 0 {
-			da[1][i] *= 2
-			da[2][i] *= 2
-		}
-	}
-
-	var ida [][]interface{}
-	for _, x := range da {
-		ida = append(ida, []interface{}{x})
-	}
-	na := []string{"y"}
-	for j := 0; j < p; j++ {
-		na = append(na, fmt.Sprintf("x%d", j+1))
-	}
-	dp := dstream.NewFromArrays(ida, na)
-	dp = dstream.SizeChunk(dp, chunksize)
-	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
-
-	return dp, rdp
+	_ = doc // just a smoke test
 }
 
 func TestDOC2(t *testing.T) {
 
-	dp, rdp := docdat2(1000)
-	_ = dp
+	ars := arspec{n: 10000, p: 5, r: 0.6}
+	_, rdp := docdat1(1000, ars)
 
-	doc := &DOC{
-		chunkMoment: chunkMoment{
-			Data: rdp,
-		},
-	}
-
-	doc.SetLogFile("s2")
-	doc.Init()
+	doc := NewDOC(rdp).SetLogFile("s2").Done()
 	doc.Fit(4)
 
-	_ = doc
+	_ = doc // Just a smoke test
 }
 
 // Generate data from a forward regression model.  X marginally is AR,
@@ -176,7 +155,7 @@ func docdat3(chunksize int) (dstream.Dstream, dstream.Reg) {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
 	dp := dstream.NewFromArrays(ida, na)
-	dp = dstream.SizeChunk(dp, chunksize)
+	dp = dstream.MaxChunkSize(dp, chunksize)
 	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
 	return dp, rdp
@@ -184,20 +163,28 @@ func docdat3(chunksize int) (dstream.Dstream, dstream.Reg) {
 
 func TestDOC3(t *testing.T) {
 
-	dp, rdp := docdat3(1000)
-	_ = dp
+	_, rdp := docdat3(1000)
 
-	doc := &DOC{
-		chunkMoment: chunkMoment{
-			Data: rdp,
-		},
-	}
-
-	doc.SetLogFile("s3")
-	doc.Init()
+	doc := NewDOC(rdp).SetLogFile("s3").Done()
 	doc.Fit(2)
 
-	_ = doc
+	_ = doc // Just a smoke test
+}
+
+func TestProj(t *testing.T) {
+
+	xform := func(i, j int, x float64) float64 {
+		if j <= 2 {
+			return 2 * x
+		}
+		return x
+	}
+
+	ars := arspec{n: 10000, p: 5, r: 0.6, xform: xform}
+	_, rdp := docdat1(1000, ars)
+
+	doc := NewDOC(rdp).SetLogFile("sp").SetProjection(2).Done()
+	doc.Fit(2)
 }
 
 func TestMeandir(t *testing.T){
