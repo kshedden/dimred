@@ -6,12 +6,13 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/gonum/floats"
-	"github.com/gonum/matrix/mat64"
+	"gonum.org/v1/gonum/floats"
+	"gonum.org/v1/gonum/mat"
+
 	"github.com/kshedden/dstream/dstream"
 )
 
-func armat(d int, r float64) mat64.Symmetric {
+func armat(d int, r float64) mat.Symmetric {
 
 	c := make([]float64, d*d)
 
@@ -21,7 +22,7 @@ func armat(d int, r float64) mat64.Symmetric {
 		}
 	}
 
-	return mat64.NewSymDense(d, c)
+	return mat.NewSymDense(d, c)
 }
 
 func gendat1(chunksize int) (dstream.Dstream, dstream.Reg) {
@@ -102,11 +103,11 @@ func TestSIR1(t *testing.T) {
 	}
 
 	// Check that the marginal covariance is approximately AR(0.6)
-	mcc := new(mat64.Dense)
+	mcc := new(mat.Dense)
 	mcc.Sub(sir.MargCov(), sir.CovMean())
-	dm := new(mat64.Dense)
+	dm := new(mat.Dense)
 	dm.Sub(mcc, armat(5, 0.6))
-	dmx := mat64.Norm(dm, 2)
+	dmx := mat.Norm(dm, 2)
 	if dmx > 0.1 {
 		fmt.Printf("Marginal covariances do not match: %f\n", dmx)
 		t.Fail()
@@ -185,9 +186,9 @@ func TestSIR2(t *testing.T) {
 	sir.Init()
 
 	// Check that the marginal covariance is approximately AR(0.6)
-	dm := new(mat64.Dense)
+	dm := new(mat.Dense)
 	dm.Sub(sir.MargCov(), armat(5, 0.6))
-	dmx := mat64.Norm(dm, 2)
+	dmx := mat.Norm(dm, 2)
 	if dmx > 0.1 {
 		fmt.Printf("Marginal covariances do not match: %f\n", dmx)
 		t.Fail()

@@ -6,8 +6,9 @@ import (
 	"math"
 	"os"
 
-	"github.com/gonum/floats"
-	"github.com/gonum/matrix/mat64"
+	"gonum.org/v1/gonum/floats"
+	"gonum.org/v1/gonum/mat"
+
 	"github.com/kshedden/dstream/dstream"
 )
 
@@ -57,6 +58,12 @@ func (doc *DOC) MeanDir() []float64 {
 	return doc.invproject(doc.meandir)
 }
 
+// Eig returns the DOC eigenvalues.
+func (doc *DOC) Eig() []float64 {
+
+	return doc.eig
+}
+
 func NewDOC(data dstream.Reg) *DOC {
 
 	d := &DOC{
@@ -89,8 +96,8 @@ func (doc *DOC) Fit(ndir int) {
 	}
 	pp := p * p
 
-	margcov := mat64.NewSymDense(p, doc.GetMargCov())
-	msr := new(mat64.Cholesky)
+	margcov := mat.NewSymDense(p, doc.GetMargCov())
+	msr := new(mat.Cholesky)
 	if ok := msr.Factorize(margcov); !ok {
 		print("Can't factorize marginal covariance")
 		panic("")
@@ -102,7 +109,7 @@ func (doc *DOC) Fit(ndir int) {
 	// TODO: what is the right standardization to use here?
 	doc.meandir = make([]float64, p)
 	floats.SubTo(doc.meandir, doc.GetMean(0), doc.GetMean(1))
-	v := mat64.NewVector(p, doc.meandir)
+	v := mat.NewVecDense(p, doc.meandir)
 	err := v.SolveVec(margcov, v)
 	if err != nil {
 		panic(err)
@@ -116,13 +123,12 @@ func (doc *DOC) Fit(ndir int) {
 	// covariances.
 	cd := make([]float64, pp)
 	floats.SubTo(cd, doc.GetCov(0), doc.GetCov(1))
-	cdm := mat64.NewSymDense(p, cd)
-	q1 := new(mat64.TriDense)
-	q1.LFromCholesky(msr)
-	q2 := new(mat64.Dense)
+	cdm := mat.NewSymDense(p, cd)
+	q1 := msr.LTo(nil)
+	q2 := new(mat.Dense)
 	q2.Solve(q1, cdm)
 	doc.stcovdiff = make([]float64, pp)
-	q3 := mat64.NewDense(p, p, doc.stcovdiff)
+	q3 := mat.NewDense(p, p, doc.stcovdiff)
 	err = q3.Solve(q1, q2.T())
 	if err != nil {
 		panic("can't back-transform")
@@ -134,8 +140,8 @@ func (doc *DOC) Fit(ndir int) {
 
 	// Calculate the eigenvectors of the standardized covariance
 	// difference
-	es := new(mat64.EigenSym)
-	m1 := mat64.NewSymDense(p, doc.stcovdiff)
+	es := new(mat.EigenSym)
+	m1 := mat.NewSymDense(p, doc.stcovdiff)
 	ok := es.Factorize(m1, true)
 	if !ok {
 		panic("can't factorize")
@@ -151,11 +157,11 @@ func (doc *DOC) Fit(ndir int) {
 	floats.Argsort(eq, ii)
 
 	doc.stcovdirs = make([][]float64, ndir)
-	m4 := new(mat64.Dense)
+	m4 := new(mat.Dense)
 	m4.EigenvectorsSym(es)
 	for j := 0; j < ndir; j++ {
 		k := ii[len(ii)-j-1]
-		doc.stcovdirs[j] = mat64.Col(nil, k, m4)
+		doc.stcovdirs[j] = mat.Col(nil, k, m4)
 		doc.eig = append(doc.eig, eig[k])
 	}
 	if doc.log != nil {
@@ -165,12 +171,11 @@ func (doc *DOC) Fit(ndir int) {
 
 	// The DR direction obtained from the covariances
 	doc.covdirs = make([][]float64, ndir)
-	qm := new(mat64.TriDense)
-	qm.LFromCholesky(msr)
+	qm := msr.LTo(nil)
 	for j, v := range doc.stcovdirs {
 		doc.covdirs[j] = make([]float64, p)
-		u := mat64.NewVector(p, doc.covdirs[j])
-		w := mat64.NewVector(p, v)
+		u := mat.NewVecDense(p, doc.covdirs[j])
+		w := mat.NewVecDense(p, v)
 		err = u.SolveVec(qm.T(), w)
 		if err != nil {
 			print("can't back-transform covariance directions")

@@ -7,10 +7,11 @@ import (
 	"os"
 	"sort"
 
-	"github.com/gonum/blas"
-	"github.com/gonum/blas/blas64"
-	"github.com/gonum/floats"
-	"github.com/gonum/matrix/mat64"
+	"gonum.org/v1/gonum/blas"
+	"gonum.org/v1/gonum/blas/blas64"
+	"gonum.org/v1/gonum/floats"
+	"gonum.org/v1/gonum/mat"
+
 	"github.com/kshedden/dstream/dstream"
 )
 
@@ -47,13 +48,13 @@ type SIR struct {
 	ccmnb []float64   // Covariance of conditional means
 
 	// Matrix objects containing moments
-	mcov mat64.Symmetric // Marginal covariance
-	ccmn mat64.Symmetric // Covariance of conditional means
+	mcov mat.Symmetric // Marginal covariance
+	ccmn mat.Symmetric // Covariance of conditional means
 
 	// Used for covariance projection
-	projBasis  mat64.Matrix
-	ccmnNoProj mat64.Symmetric
-	mcovNoProj mat64.Symmetric
+	projBasis  mat.Matrix
+	ccmnNoProj mat.Symmetric
+	mcovNoProj mat.Symmetric
 
 	// Optional log
 	log *log.Logger
@@ -214,7 +215,7 @@ func (sir *SIR) marg() {
 	sir.mcovb = make([]float64, pp)
 	floats.AddTo(sir.mcovb, wc, bc)
 
-	sir.mcov = mat64.NewSymDense(p, sir.mcovb)
+	sir.mcov = mat.NewSymDense(p, sir.mcovb)
 }
 
 // getccmn calculates Cov E[X|Y], the covariance of the conditional
@@ -250,7 +251,7 @@ func (sir *SIR) getccmn() {
 	}
 
 	sir.ccmnb = ccmn
-	sir.ccmn = mat64.NewSymDense(p, ccmn)
+	sir.ccmn = mat.NewSymDense(p, ccmn)
 }
 
 // Init calculates summary statistics but does not calculate the EDR
@@ -275,14 +276,14 @@ func (sir *SIR) Init() {
 	}
 }
 
-func (sir *SIR) MargCov() mat64.Symmetric {
+func (sir *SIR) MargCov() mat.Symmetric {
 	if sir.mcovNoProj != nil {
 		return sir.mcovNoProj
 	}
 	return sir.mcov
 }
 
-func (sir *SIR) CovMean() mat64.Symmetric {
+func (sir *SIR) CovMean() mat.Symmetric {
 	if sir.ccmnNoProj != nil {
 		return sir.ccmnNoProj
 	}
@@ -291,7 +292,7 @@ func (sir *SIR) CovMean() mat64.Symmetric {
 
 func (sir *SIR) MargCovEigs() []float64 {
 
-	var es mat64.EigenSym
+	var es mat.EigenSym
 	ok := es.Factorize(sir.mcov, false)
 	if !ok {
 		panic("unable to determine eigenvectors of marginal covariance")
@@ -303,10 +304,10 @@ func (sir *SIR) MargCovEigs() []float64 {
 }
 
 // conjugate returns b'* a * b, a must be non-singular
-func conjugate(a mat64.Symmetric, b mat64.Matrix) mat64.Symmetric {
-	q1 := new(mat64.Dense)
+func conjugate(a mat.Symmetric, b mat.Matrix) mat.Symmetric {
+	q1 := new(mat.Dense)
 	q1.Mul(b.T(), a)
-	q2 := new(mat64.Dense)
+	q2 := new(mat.Dense)
 	q2.Mul(b.T(), q1.T())
 	ma := q2.RawMatrix()
 	sy := new(blas64.Symmetric)
@@ -314,7 +315,7 @@ func conjugate(a mat64.Symmetric, b mat64.Matrix) mat64.Symmetric {
 	sy.Stride = ma.Stride
 	sy.Data = ma.Data
 	sy.Uplo = blas.Upper
-	q3 := new(mat64.SymDense)
+	q3 := new(mat.SymDense)
 	q3.SetRawSymmetric(*sy)
 	return q3
 }
@@ -327,20 +328,20 @@ func (sir *SIR) ProjectEigen(ndim int) {
 	p := sir.Data.NumCov()
 	mcov := sir.mcov
 
-	es := new(mat64.EigenSym)
+	es := new(mat.EigenSym)
 	ok := es.Factorize(mcov, true)
 	if !ok {
 		panic("unable to determine eigenvectors of marginal covariance")
 	}
 
-	evec := new(mat64.Dense)
+	evec := new(mat.Dense)
 	evec.EigenvectorsSym(es)
 	if sir.log != nil {
 		sir.log.Printf("Eigenvalues of marginal covariance:")
 		sir.log.Printf(fmt.Sprintf("%v\n", es.Values(nil)))
 		sir.log.Printf(fmt.Sprintf("Retaining %d-dimensional eigenspace, dropping %d dimensions\n", ndim, p-ndim))
 	}
-	evecv := evec.View(0, p-ndim, p, ndim)
+	evecv := evec.Slice(0, p, 0, ndim)
 
 	sir.projBasis = evecv
 	sir.mcovNoProj = sir.mcov
@@ -365,11 +366,11 @@ func (sir *SIR) Fit() {
 		ndir = p
 	}
 
-	msr := new(mat64.Cholesky)
+	msr := new(mat.Cholesky)
 	if ok := msr.Factorize(mcov); !ok {
 		// Provide error information before exiting
 		print("Marginal covariance is not PSD\n")
-		ei := new(mat64.EigenSym)
+		ei := new(mat.EigenSym)
 		if ok := ei.Factorize(mcov, false); !ok {
 			panic("Cannot obtain eigenvalues either.\n")
 		}
@@ -377,17 +378,16 @@ func (sir *SIR) Fit() {
 		os.Stderr.Write([]byte(fmt.Sprintf("%v\n", ei.Values(nil))))
 	}
 
-	q1 := new(mat64.TriDense)
-	q2 := new(mat64.Dense)
-	q3 := new(mat64.Dense)
-	q1.LFromCholesky(msr)
+	q1 := msr.LTo(nil)
+	q2 := new(mat.Dense)
+	q3 := new(mat.Dense)
 
 	q2.Solve(q1, ccmn)
 	q3.Solve(q1, q2.T())
 
 	// q3 is a symmetric matrix but not of type Symmetric, would
 	// be better to use EigenSym here but hard to convert.
-	var ei mat64.Eigen
+	var ei mat.Eigen
 	ok := ei.Factorize(q3, false, true)
 	if !ok {
 		panic("Can't factorize covariance of means matrix\n")
@@ -409,7 +409,7 @@ func (sir *SIR) Fit() {
 
 	// Unpack the direction vectors
 	for j := 0; j < ndir; j++ {
-		sir.Dir = append(sir.Dir, mat64.Col(nil, j, dir))
+		sir.Dir = append(sir.Dir, mat.Col(nil, j, dir))
 	}
 
 	// If needed, convert to original basis
@@ -417,8 +417,8 @@ func (sir *SIR) Fit() {
 		p := sir.Data.NumCov()
 		for j := 0; j < ndir; j++ {
 			b := make([]float64, p)
-			v := mat64.NewVector(p, b)
-			u := mat64.NewVector(len(sir.Dir[j]), sir.Dir[j])
+			v := mat.NewVecDense(p, b)
+			u := mat.NewVecDense(len(sir.Dir[j]), sir.Dir[j])
 			v.MulVec(sir.projBasis, u)
 			sir.Dir[j] = b
 		}

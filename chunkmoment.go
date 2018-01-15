@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/gonum/floats"
-	"github.com/gonum/matrix/mat64"
+	"gonum.org/v1/gonum/floats"
+	"gonum.org/v1/gonum/mat"
+
 	"github.com/kshedden/dstream/dstream"
 )
 
@@ -35,7 +36,7 @@ type chunkMoment struct {
 	// The means and covariances may be projected against this
 	// basis before returning. If projDim = 0, projBasis should be
 	// ignored.
-	projBasis mat64.Matrix
+	projBasis mat.Matrix
 	projDim   int
 
 	log *log.Logger
@@ -72,20 +73,20 @@ func (cm *chunkMoment) doProjection(ndim int) {
 	p := cm.Data.NumCov()
 	mcov := cm.margcov
 
-	es := new(mat64.EigenSym)
-	ok := es.Factorize(mat64.NewSymDense(p, mcov), true)
+	es := new(mat.EigenSym)
+	ok := es.Factorize(mat.NewSymDense(p, mcov), true)
 	if !ok {
 		panic("unable to determine eigenvectors of marginal covariance")
 	}
 
-	evec := new(mat64.Dense)
+	evec := new(mat.Dense)
 	evec.EigenvectorsSym(es)
 	if cm.log != nil {
 		cm.log.Printf("Eigenvalues of marginal covariance for projection:")
 		cm.log.Printf(fmt.Sprintf("%v\n", es.Values(nil)))
 		cm.log.Printf(fmt.Sprintf("Retaining %d-dimensional eigenspace, dropping %d dimensions\n", ndim, p-ndim))
 	}
-	evecv := evec.View(0, p-ndim, p, ndim)
+	evecv := evec.Slice(0, p, 0, ndim)
 
 	cm.projBasis = evecv
 	cm.projDim = ndim
@@ -239,7 +240,7 @@ func (cm *chunkMoment) Dim() int {
 // conjugate takes an input matrix mat, and returns its conjugation B'
 // * mat * B by the projection basis B.  mat must be p x p, where p is
 // the number of variables.
-func (cm *chunkMoment) conjugate(mat []float64) []float64 {
+func (cm *chunkMoment) conjugate(ma []float64) []float64 {
 	q := cm.Data.NumCov() // Original dimension
 	p := cm.projDim       // New dimension
 
@@ -247,9 +248,9 @@ func (cm *chunkMoment) conjugate(mat []float64) []float64 {
 	mc := make([]float64, p*p)
 
 	// Do the conjugation
-	left := new(mat64.Dense)
-	left.Mul(cm.projBasis.T(), mat64.NewDense(q, q, mat))
-	r := mat64.NewDense(p, p, mc)
+	left := new(mat.Dense)
+	left.Mul(cm.projBasis.T(), mat.NewDense(q, q, ma))
+	r := mat.NewDense(p, p, mc)
 	r.Mul(left, cm.projBasis)
 
 	return mc
@@ -267,8 +268,8 @@ func (cm *chunkMoment) project(vec []float64) []float64 {
 	mp := make([]float64, p)
 
 	// Do the projection
-	r := mat64.NewVector(p, mp)
-	r.MulVec(cm.projBasis.T(), mat64.NewVector(q, vec))
+	r := mat.NewVecDense(p, mp)
+	r.MulVec(cm.projBasis.T(), mat.NewVecDense(q, vec))
 
 	return mp
 }
@@ -281,8 +282,8 @@ func (cm *chunkMoment) invproject(vec []float64) []float64 {
 	p := cm.projDim       // New dimension
 
 	u := make([]float64, q)
-	r := mat64.NewVector(q, u)
-	r.MulVec(cm.projBasis, mat64.NewVector(p, vec))
+	r := mat.NewVecDense(q, u)
+	r.MulVec(cm.projBasis, mat.NewVecDense(p, vec))
 
 	return u
 }
