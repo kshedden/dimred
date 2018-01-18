@@ -13,7 +13,16 @@ import (
 )
 
 type DOC struct {
-	chunkMoment
+	*chunkMoment
+
+	// Name of the binary response variable
+	responseVarName string
+
+	// Position of the binary response variable
+	responseVarPos int
+
+	// Positions of all other variables
+	xpos []int
 
 	// The dimension reduction direction obtained from the means.
 	// Also, the standardized difference between the means for Y=1
@@ -64,12 +73,11 @@ func (doc *DOC) Eig() []float64 {
 	return doc.eig
 }
 
-func NewDOC(data dstream.Reg) *DOC {
+// NewDOC returns a new DOC value for the given data stream.
+func NewDOC(data dstream.Dstream, response string) *DOC {
 
 	d := &DOC{
-		chunkMoment: chunkMoment{
-			Data: data,
-		},
+		chunkMoment: newChunkMoment(data, response),
 	}
 
 	return d

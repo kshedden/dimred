@@ -20,15 +20,26 @@ type SliceFunc func(float64) int
 
 type SIR struct {
 
+	// TODO: should embed a chunkMoment here like DOC
+
 	// The data used to perform the analysis
-	Data dstream.Reg
+	Data dstream.Dstream
+
+	// Name of the response variable
+	responseName string
+
+	// Position of the response variable
+	ypos int
+
+	// Positions of the independent variables
+	xpos []int
 
 	// A function returning the slice index of each response value
 	Slicer SliceFunc
 
 	// The number of directions to retain.  If 0, all directions
 	// are retained.
-	NDir int
+	ndir int
 
 	// The estimated directions
 	Dir [][]float64
@@ -66,7 +77,38 @@ type SIR struct {
 	doneInit bool // true if Init has run
 }
 
-func (sir *SIR) SetLogFile(filename string) {
+func NewSIR(data dstream.Dstream, response string, slice SliceFunc) *SIR {
+
+	na := data.Names()
+	ypos := -1
+	for i, a := range na {
+		if a == response {
+			ypos = i
+			break
+		}
+	}
+	if ypos == -1 {
+		msg := "Can't find response variable"
+		panic(msg)
+	}
+
+	var xpos []int
+	for i := range data.Names() {
+		if i != ypos {
+			xpos = append(xpos, i)
+		}
+	}
+
+	return &SIR{
+		Data:         data,
+		Slicer:       slice,
+		responseName: response,
+		ypos:         ypos,
+		xpos:         xpos,
+	}
+}
+
+func (sir *SIR) SetLogFile(filename string) *SIR {
 
 	fid, err := os.Create(filename)
 	if err != nil {
@@ -74,6 +116,8 @@ func (sir *SIR) SetLogFile(filename string) {
 	}
 
 	sir.log = log.New(fid, "", log.Lshortfile)
+
+	return sir
 }
 
 // reflect copies the lower triangle of a square matrix into the upper
@@ -91,22 +135,22 @@ func reflect(x []float64, p int) {
 func (sir *SIR) getstats() {
 
 	sir.Data.Reset()
-	p := sir.Data.NumCov()
+	p := sir.Data.NumVar() - 1
 	pp := p * p
 
 	var sl []int // slice indices for current chunk
 
 	for sir.Data.Next() {
 
-		y := sir.Data.YData()
+		y := sir.Data.GetPos(sir.ypos).([]float64)
 		sir.n += len(y)
 		sir.nchunk++
 		sir.nc = append(sir.nc, len(y))
 
 		// Mean of current chunk
 		chm := make([]float64, p)
-		for j := 0; j < p; j++ {
-			x := sir.Data.XData(j)
+		for j, xp := range sir.xpos {
+			x := sir.Data.GetPos(xp).([]float64)
 			chm[j] = floats.Sum(x) / float64(len(x))
 		}
 		sir.cmn = append(sir.cmn, chm)
@@ -129,8 +173,9 @@ func (sir *SIR) getstats() {
 		}
 
 		cv := make([]float64, pp) // within-chunk covariance
-		for j1 := 0; j1 < p; j1++ {
-			x1 := sir.Data.XData(j1)
+		for j1, xp1 := range sir.xpos {
+
+			x1 := sir.Data.GetPos(xp1).([]float64)
 
 			// Update the slice mean and count
 			for i, s := range sl {
@@ -145,7 +190,10 @@ func (sir *SIR) getstats() {
 
 			// Update the within-chunk covariance
 			for j2 := 0; j2 <= j1; j2++ {
-				x2 := sir.Data.XData(j2)
+
+				xp2 := sir.xpos[j2]
+				x2 := sir.Data.GetPos(xp2).([]float64)
+
 				for i, s := range sl {
 					if s >= 0 {
 						cv[j1*p+j2] += (x1[i] - chm[j1]) * (x2[i] - chm[j2])
@@ -176,7 +224,7 @@ func (sir *SIR) SliceMeans() [][]float64 {
 // marg pools over the chunks to obtain the marginal mean and covariance
 func (sir *SIR) marg() {
 
-	p := sir.Data.NumCov()
+	p := sir.Data.NumVar() - 1
 	pp := p * p
 
 	// Get the marginal mean
@@ -222,7 +270,7 @@ func (sir *SIR) marg() {
 // means.
 func (sir *SIR) getccmn() {
 
-	p := sir.Data.NumCov()
+	p := sir.Data.NumVar() - 1
 	pp := p * p
 	mn := sir.mn
 	ccmn := make([]float64, pp)
@@ -258,13 +306,19 @@ func (sir *SIR) getccmn() {
 // directions.  Fit calls Init automatically if needed, but Init
 // should be called explicitly if prior to calling ProjectEigen or
 // other modifiers prior to fit.
-func (sir *SIR) Init() {
+func (sir *SIR) Done() *SIR {
+
+	// Default number of EDR directions.
+	if sir.ndir == 0 {
+		sir.ndir = 1
+	}
+
 	sir.getstats()
 	sir.marg()
 	sir.getccmn()
 	sir.doneInit = true
 	if sir.log != nil {
-		sir.log.Printf("%d variables\n", sir.Data.NumCov())
+		sir.log.Printf("%d variables\n", sir.Data.NumVar()-1)
 		sir.log.Printf("%d data records used\n", sir.n)
 		sir.log.Printf("%d chunks read\n", sir.nchunk)
 		sir.log.Printf("%d data records with negative slice index skipped\n", sir.nskip)
@@ -274,6 +328,8 @@ func (sir *SIR) Init() {
 			sir.log.Printf("%6d    %6d\n", j, n)
 		}
 	}
+
+	return sir
 }
 
 func (sir *SIR) MargCov() mat.Symmetric {
@@ -325,7 +381,7 @@ func conjugate(a mat.Symmetric, b mat.Matrix) mat.Symmetric {
 // the marginal covariance matrix.
 func (sir *SIR) ProjectEigen(ndim int) {
 
-	p := sir.Data.NumCov()
+	p := sir.Data.NumVar() - 1
 	mcov := sir.mcov
 
 	es := new(mat.EigenSym)
@@ -350,21 +406,16 @@ func (sir *SIR) ProjectEigen(ndim int) {
 	sir.ccmn = conjugate(sir.ccmn, evecv)
 }
 
+// NDir sets the number of EDR directions to estimate.
+func (sir *SIR) NDir(ndir int) *SIR {
+	sir.ndir = ndir
+	return sir
+}
+
 func (sir *SIR) Fit() {
 
-	if !sir.doneInit {
-		sir.Init()
-	}
-
-	p := sir.Data.NumCov()
 	mcov := sir.mcov
 	ccmn := sir.ccmn
-
-	// Number of directions to retain
-	ndir := sir.NDir
-	if ndir == 0 {
-		ndir = p
-	}
 
 	msr := new(mat.Cholesky)
 	if ok := msr.Factorize(mcov); !ok {
@@ -398,8 +449,8 @@ func (sir *SIR) Fit() {
 
 	// Convert the eigenvalues to real
 	evc := ei.Values(nil)
-	ev := make([]float64, ndir)
-	for i, x := range evc[0:ndir] {
+	ev := make([]float64, sir.ndir)
+	for i, x := range evc[0:sir.ndir] {
 		if math.Abs(imag(x)) > 1e-5 {
 			panic("imaginary eigenvalues")
 		}
@@ -408,14 +459,14 @@ func (sir *SIR) Fit() {
 	sir.Eig = ev
 
 	// Unpack the direction vectors
-	for j := 0; j < ndir; j++ {
+	for j := 0; j < sir.ndir; j++ {
 		sir.Dir = append(sir.Dir, mat.Col(nil, j, dir))
 	}
 
 	// If needed, convert to original basis
 	if sir.projBasis != nil {
-		p := sir.Data.NumCov()
-		for j := 0; j < ndir; j++ {
+		p := sir.Data.NumVar() - 1
+		for j := 0; j < sir.ndir; j++ {
 			b := make([]float64, p)
 			v := mat.NewVecDense(p, b)
 			u := mat.NewVecDense(len(sir.Dir[j]), sir.Dir[j])

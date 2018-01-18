@@ -11,11 +11,24 @@ import (
 )
 
 // chunkMoment calculates first and second moments (means and
-// covariances) for streaming data, stratifying by grouping variable.
+// covariances) for multivariate streaming data, stratifying by a
+// grouping variable.
+//
+// The calculations are done in a memory-efficient way.  The target
+// values are accumulated in-place, and in addition one p-vector
+// (where p is the ambient dimension) is saved for each data chunk.
+// So if there are m data chunks, m*p memory is used in addition to
+// the memory storing the values of interest.
 type chunkMoment struct {
 
 	// The data used to perform the analysis
-	Data dstream.Reg
+	Data dstream.Dstream
+
+	// Positions of variables used for mean and covariance calculation
+	xpos []int
+
+	// Position of stratifying variable
+	ypos int
 
 	// Sample size, mean and covariance, separately by y level, but
 	// marginal over chunks.
@@ -23,15 +36,24 @@ type chunkMoment struct {
 	mean [][]float64
 	cov  [][]float64
 
-	ntot   int // overall sample size
-	nchunk int // number of chunks
+	// Overall sample size
+	ntot int
 
+	// Number of chunks
+	nchunk int
+
+	// chunkmeans[c][i][] is the mean vector for observations with
+	// y=i within chunk c
 	chunkmeans [][][]float64
-	chunkn     [][]int
 
-	// Marginal mean and covariance
+	// chunkn[c][i] is the sample size for y=i within chunk c
+	chunkn [][]int
+
+	// Marginal mean vector
 	margmean []float64
-	margcov  []float64
+
+	// Marginal covariance matrix (stored as 1d array)
+	margcov []float64
 
 	// The means and covariances may be projected against this
 	// basis before returning. If projDim = 0, projBasis should be
@@ -40,6 +62,35 @@ type chunkMoment struct {
 	projDim   int
 
 	log *log.Logger
+}
+
+func newChunkMoment(data dstream.Dstream, yname string) *chunkMoment {
+
+	ypos := -1
+	for j, na := range data.Names() {
+		if na == yname {
+			ypos = j
+		}
+	}
+	if ypos == -1 {
+		msg := fmt.Sprintf("Can't find variable %s", yname)
+		panic(msg)
+	}
+
+	var xpos []int
+	for j := 0; j < data.NumVar(); j++ {
+		if j != ypos {
+			xpos = append(xpos, j)
+		}
+	}
+
+	cm := &chunkMoment{
+		ypos: ypos,
+		xpos: xpos,
+		Data: data,
+	}
+
+	return cm
 }
 
 func (cm *chunkMoment) MargCov() []float64 {
@@ -70,7 +121,7 @@ func (cm *chunkMoment) doProjection(ndim int) {
 		cm.projBasis = nil
 	}
 
-	p := cm.Data.NumCov()
+	p := cm.Data.NumVar() - 1
 	mcov := cm.margcov
 
 	es := new(mat.EigenSym)
@@ -112,7 +163,7 @@ func zeroStack(x [][]float64) [][]float64 {
 // current value of cov. Everything is stratified by y level.
 func (cm *chunkMoment) addBetweenCov() {
 
-	p := cm.Data.NumCov()
+	p := cm.Data.NumVar() - 1
 	pp := p * p
 	wk := make([]float64, pp)
 
@@ -148,14 +199,14 @@ func (cm *chunkMoment) addBetweenCov() {
 // calculated and returned.
 func (cm *chunkMoment) chunkMean() ([][]float64, []int) {
 
-	p := cm.Data.NumCov()
-	y := cm.Data.YData()
+	p := cm.Data.NumVar() - 1
+	y := cm.Data.GetPos(cm.ypos).([]float64)
 	var mn [][]float64
 	var ny []int
 
 	// Calculate the sums and sample sizes
-	for j := 0; j < p; j++ {
-		x := cm.Data.XData(j)
+	for j, xp := range cm.xpos {
+		x := cm.Data.GetPos(xp).([]float64)
 		for i := 0; i < len(y); i++ {
 			yi := int(y[i])
 			mn = growf(mn, yi, p)
@@ -199,16 +250,17 @@ func growi(ar []int, y int) []int {
 // needed.
 func (cm *chunkMoment) chunkCov(cov [][]float64, mn [][]float64, ny []int) [][]float64 {
 
-	p := cm.Data.NumCov()
+	p := cm.Data.NumVar() - 1
 	pp := p * p
 	cov = zeroStack(cov)
-	y := cm.Data.YData()
+	y := cm.Data.GetPos(cm.ypos).([]float64)
 
 	// Fill in one triangle of the covariance.
-	for j1 := 0; j1 < p; j1++ {
-		x1 := cm.Data.XData(j1)
+	for j1, xp1 := range cm.xpos {
+		x1 := cm.Data.GetPos(xp1).([]float64)
 		for j2 := 0; j2 <= j1; j2++ {
-			x2 := cm.Data.XData(j2)
+			xp2 := cm.xpos[j2]
+			x2 := cm.Data.GetPos(xp2).([]float64)
 			for i := 0; i < len(y); i++ {
 				yi := int(y[i])
 				cov = growf(cov, yi, pp)
@@ -232,7 +284,7 @@ func (cm *chunkMoment) chunkCov(cov [][]float64, mn [][]float64, ny []int) [][]f
 // in all means and covariances).
 func (cm *chunkMoment) Dim() int {
 	if cm.projDim == 0 {
-		return cm.Data.NumCov()
+		return cm.Data.NumVar() - 1
 	}
 	return cm.projDim
 }
@@ -241,8 +293,8 @@ func (cm *chunkMoment) Dim() int {
 // * mat * B by the projection basis B.  mat must be p x p, where p is
 // the number of variables.
 func (cm *chunkMoment) conjugate(ma []float64) []float64 {
-	q := cm.Data.NumCov() // Original dimension
-	p := cm.projDim       // New dimension
+	q := cm.Data.NumVar() - 1 // Original dimension
+	p := cm.projDim           // New dimension
 
 	// The result will go here.
 	mc := make([]float64, p*p)
@@ -261,8 +313,8 @@ func (cm *chunkMoment) conjugate(ma []float64) []float64 {
 // p is the number of variables.
 func (cm *chunkMoment) project(vec []float64) []float64 {
 
-	q := cm.Data.NumCov() // Original dimension
-	p := cm.projDim       // New dimension
+	q := cm.Data.NumVar() - 1 // Original dimension
+	p := cm.projDim           // New dimension
 
 	// The result will go here.
 	mp := make([]float64, p)
@@ -278,8 +330,8 @@ func (cm *chunkMoment) project(vec []float64) []float64 {
 // back to the original coordinate system.
 func (cm *chunkMoment) invproject(vec []float64) []float64 {
 
-	q := cm.Data.NumCov() // Original dimension
-	p := cm.projDim       // New dimension
+	q := cm.Data.NumVar() - 1 // Original dimension
+	p := cm.projDim           // New dimension
 
 	u := make([]float64, q)
 	r := mat.NewVecDense(q, u)
@@ -346,7 +398,7 @@ func (cm *chunkMoment) walk() {
 	cm.chunkmeans = cm.chunkmeans[0:0]
 	cm.ny = cm.ny[0:0]
 
-	p := cm.Data.NumCov()
+	p := cm.Data.NumVar() - 1
 	pp := p * p
 
 	// A stack of p^2 dimensional workspaces.
@@ -354,7 +406,7 @@ func (cm *chunkMoment) walk() {
 
 	for cm.Data.Next() {
 
-		y := cm.Data.YData()
+		y := cm.Data.GetPos(cm.ypos).([]float64)
 		n := len(y)
 		cm.ntot += n
 		cm.nchunk++
@@ -422,7 +474,7 @@ func (cm *chunkMoment) walk() {
 // levels to get the marginal mean.
 func (cm *chunkMoment) calcMargMean() {
 
-	p := cm.Data.NumCov()
+	p := cm.Data.NumVar() - 1
 	margmean := make([]float64, p)
 
 	for yi, v := range cm.mean {
@@ -447,7 +499,7 @@ func (cm *chunkMoment) calcMargCov() {
 		cm.calcMargMean()
 	}
 
-	p := cm.Data.NumCov()
+	p := cm.Data.NumVar() - 1
 	pp := p * p
 
 	// Mean within-y covariance

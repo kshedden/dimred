@@ -1,11 +1,9 @@
 package dimred
 
 import (
-	"bufio"
 	"fmt"
 	"math"
 	"math/rand"
-	"os"
 	"testing"
 
 	"gonum.org/v1/gonum/floats"
@@ -13,77 +11,73 @@ import (
 	"github.com/kshedden/dstream/dstream"
 )
 
-func cmdat1(chunksize int) (dstream.Dstream, dstream.Reg) {
+func cmdat1(chunksize int) dstream.Dstream {
 
-	n := 100
-	p := 3
-	r := 0.6
-	rc := math.Sqrt(1 - r*r)
-	da := make([][]float64, p+2)
 	rand.Seed(34234)
 
-	// Covariates
-	for j := 0; j < p+2; j++ {
-		if j == 0 {
-			for i := 0; i < n; i++ {
-				da[j] = append(da[j], rand.NormFloat64())
-			}
-		} else {
-			for i := 0; i < n; i++ {
-				da[j] = append(da[j], r*da[j-1][i]+rc*rand.NormFloat64())
-			}
+	// Sample size
+	n := 100
+
+	// Number of covariates
+	p := 3
+
+	// Autocorrelation
+	r := 0.6
+	rc := math.Sqrt(1 - r*r)
+
+	// y, followed by p x's, followed by a segment variable
+	da := make([][]float64, p+2)
+
+	// Autocorrelated covariates
+	for i := 0; i < n; i++ {
+		da[0] = append(da[0], rand.NormFloat64())
+	}
+	for j := 1; j < p+1; j++ {
+		for i := 0; i < n; i++ {
+			da[j] = append(da[j], r*da[j-1][i]+rc*rand.NormFloat64())
 		}
 	}
 
 	// Use to define segments
 	for i := 0; i < n; i++ {
-		da[p+1][i] = math.Floor(math.Sqrt(float64(i)))
+		da[p+1] = append(da[p+1], math.Floor(math.Sqrt(float64(i))))
 	}
 
 	// Outcome
 	for i := 0; i < n; i++ {
-		u := da[1][i] + 2*da[2][i] - 2*da[3][i]
-		if u > 1 {
+		lp := da[1][i] + 2*da[2][i] - 2*da[3][i]
+		if lp > 1 {
 			da[0][i] = 1
 		} else {
 			da[0][i] = 0
 		}
 	}
 
-	var ida [][]interface{}
-	for _, x := range da {
-		ida = append(ida, []interface{}{x})
-	}
+	// Generate names
 	na := []string{"y"}
 	for j := 0; j < p; j++ {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
 	na = append(na, "seg")
+
+	var ida [][]interface{}
+	for _, x := range da {
+		ida = append(ida, []interface{}{x})
+	}
 	dp := dstream.NewFromArrays(ida, na)
+
+	// Restructure the segments
 	dp = dstream.Segment(dp, []string{"seg"})
 	dp = dstream.DropCols(dp, []string{"seg"})
-	na = dp.Names()
-	rdp := dstream.NewReg(dp, "y", na[1:len(na)], "", "")
 
-	return dp, rdp
+	return dp
 }
 
 func TestCM1(t *testing.T) {
 
-	_, rdp := cmdat1(20)
+	da := cmdat1(20)
 
-	if true {
-		fid, err := os.Create("tmp.csv")
-		if err != nil {
-			panic(err)
-		}
-		wtr := bufio.NewWriter(fid)
-		dstream.ToCSV(rdp).SetWriter(wtr).Done()
-		wtr.Flush()
-		fid.Close()
-	}
-
-	cm := &chunkMoment{Data: rdp}
+	cm := newChunkMoment(da, "y")
 	cm.walk()
 
 	if cm.ny[0] != 69 || cm.ny[1] != 31 {

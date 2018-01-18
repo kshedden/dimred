@@ -30,7 +30,7 @@ type arspec struct {
 	xform func(int, int, float64) float64
 }
 
-func docdat1(chunksize int, ar arspec) (dstream.Dstream, dstream.Reg) {
+func docdat1(chunksize int, ar arspec) dstream.Dstream {
 
 	rand.Seed(384293)
 
@@ -75,11 +75,10 @@ func docdat1(chunksize int, ar arspec) (dstream.Dstream, dstream.Reg) {
 	for j := 0; j < p; j++ {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
-	dp := dstream.NewFromArrays(ida, na)
-	dp = dstream.MaxChunkSize(dp, chunksize)
-	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
+	ds := dstream.NewFromArrays(ida, na)
+	ds = dstream.MaxChunkSize(ds, chunksize)
 
-	return dp, rdp
+	return ds
 }
 
 func TestDOC1(t *testing.T) {
@@ -97,9 +96,9 @@ func TestDOC1(t *testing.T) {
 	ar := arspec{n: 10000, p: 5, r: 0.6, xform: xform}
 
 	chunksize := 1000
-	_, rdp := docdat1(chunksize, ar)
+	da := docdat1(chunksize, ar)
 
-	doc := NewDOC(rdp).SetLogFile("ss").Done()
+	doc := NewDOC(da, "y").SetLogFile("ss").Done()
 	doc.Fit(4)
 
 	// Check the means
@@ -137,9 +136,9 @@ func TestDOC1(t *testing.T) {
 func TestDOC2(t *testing.T) {
 
 	ar := arspec{n: 10000, p: 5, r: 0.6}
-	_, rdp := docdat1(1000, ar)
+	da := docdat1(1000, ar)
 
-	doc := NewDOC(rdp).SetLogFile("s2").Done()
+	doc := NewDOC(da, "y").SetLogFile("s2").Done()
 	doc.Fit(4)
 
 	_ = doc // Just a smoke test
@@ -147,7 +146,7 @@ func TestDOC2(t *testing.T) {
 
 // Generate data from a forward regression model.  X marginally is AR,
 // Y|X depends only on one linear function of X.
-func docdat3(chunksize int) (dstream.Dstream, dstream.Reg) {
+func docdat3(chunksize int) dstream.Dstream {
 
 	n := 10000
 	p := 5
@@ -155,16 +154,12 @@ func docdat3(chunksize int) (dstream.Dstream, dstream.Reg) {
 	rc := math.Sqrt(1 - r*r)
 	da := make([][]float64, p+1)
 
-	// Noise
-	for j := 0; j < p+1; j++ {
-		if j == 0 {
-			for i := 0; i < n; i++ {
-				da[j] = append(da[j], rand.NormFloat64())
-			}
-		} else {
-			for i := 0; i < n; i++ {
-				da[j] = append(da[j], r*da[j-1][i]+rc*rand.NormFloat64())
-			}
+	for i := 0; i < n; i++ {
+		da[0] = append(da[0], rand.NormFloat64())
+	}
+	for j := 1; j < p+1; j++ {
+		for i := 0; i < n; i++ {
+			da[j] = append(da[j], r*da[j-1][i]+rc*rand.NormFloat64())
 		}
 	}
 
@@ -177,26 +172,27 @@ func docdat3(chunksize int) (dstream.Dstream, dstream.Reg) {
 		}
 	}
 
-	var ida [][]interface{}
-	for _, x := range da {
-		ida = append(ida, []interface{}{x})
-	}
 	na := []string{"y"}
 	for j := 0; j < p; j++ {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
-	dp := dstream.NewFromArrays(ida, na)
-	dp = dstream.MaxChunkSize(dp, chunksize)
-	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
-	return dp, rdp
+	var ida [][]interface{}
+	for _, x := range da {
+		ida = append(ida, []interface{}{x})
+	}
+
+	df := dstream.NewFromArrays(ida, na)
+	df = dstream.MaxChunkSize(df, chunksize)
+
+	return df
 }
 
 func TestDOC3(t *testing.T) {
 
-	_, rdp := docdat3(1000)
+	df := docdat3(1000)
 
-	doc := NewDOC(rdp).SetLogFile("s3").Done()
+	doc := NewDOC(df, "y").SetLogFile("s3").Done()
 	doc.Fit(2)
 
 	_ = doc // Just a smoke test
@@ -212,8 +208,8 @@ func TestProj(t *testing.T) {
 	}
 
 	ar := arspec{n: 10000, p: 5, r: 0.6, xform: xform}
-	_, rdp := docdat1(1000, ar)
+	df := docdat1(1000, ar)
 
-	doc := NewDOC(rdp).SetLogFile("sp").SetProjection(2).Done()
+	doc := NewDOC(df, "y").SetLogFile("sp").SetProjection(2).Done()
 	doc.Fit(2)
 }

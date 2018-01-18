@@ -25,7 +25,7 @@ func armat(d int, r float64) mat.Symmetric {
 	return mat.NewSymDense(d, c)
 }
 
-func gendat1(chunksize int) (dstream.Dstream, dstream.Reg) {
+func gendat1(chunksize int) dstream.Dstream {
 
 	n := 10000
 	p := 5
@@ -68,25 +68,19 @@ func gendat1(chunksize int) (dstream.Dstream, dstream.Reg) {
 	}
 	dp := dstream.NewFromArrays(ida, na)
 	dp = dstream.MaxChunkSize(dp, chunksize)
-	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
-	return dp, rdp
+	return dp
 }
 
 func TestSIR1(t *testing.T) {
 
-	_, rdp := gendat1(1000)
+	dp := gendat1(1000)
 
 	f := func(y float64) int {
 		return int(y)
 	}
 
-	sir := &SIR{
-		Data:   rdp,
-		Slicer: f,
-	}
-
-	sir.Init()
+	sir := NewSIR(dp, "y", f).Done()
 
 	// Check the slice means
 	for j, v := range [][]float64{
@@ -124,7 +118,7 @@ func TestSIR1(t *testing.T) {
 	}
 }
 
-func gendat2(chunksize int) (dstream.Dstream, dstream.Reg) {
+func gendat2(chunksize int) dstream.Dstream {
 
 	n := 10000
 	p := 5
@@ -133,15 +127,12 @@ func gendat2(chunksize int) (dstream.Dstream, dstream.Reg) {
 	da := make([][]float64, p+1)
 
 	// Noise
-	for j := 0; j < p+1; j++ {
-		if j == 0 {
-			for i := 0; i < n; i++ {
-				da[j] = append(da[j], rand.NormFloat64())
-			}
-		} else {
-			for i := 0; i < n; i++ {
-				da[j] = append(da[j], r*da[j-1][i]+rc*rand.NormFloat64())
-			}
+	for i := 0; i < n; i++ {
+		da[0] = append(da[0], rand.NormFloat64())
+	}
+	for j := 1; j < p+1; j++ {
+		for i := 0; i < n; i++ {
+			da[j] = append(da[j], r*da[j-1][i]+rc*rand.NormFloat64())
 		}
 	}
 
@@ -153,37 +144,32 @@ func gendat2(chunksize int) (dstream.Dstream, dstream.Reg) {
 		}
 	}
 
-	var ida [][]interface{}
-	for _, x := range da {
-		ida = append(ida, []interface{}{x})
-	}
+	// Names
 	na := []string{"y"}
 	for j := 0; j < p; j++ {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
+
+	var ida [][]interface{}
+	for _, x := range da {
+		ida = append(ida, []interface{}{x})
+	}
 	dp := dstream.NewFromArrays(ida, na)
 	dp = dstream.MaxChunkSize(dp, chunksize)
-	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
-	return dp, rdp
+	return dp
 }
 
 func TestSIR2(t *testing.T) {
 
-	_, rdp := gendat2(1000)
+	dp := gendat2(1000)
 
 	f := func(y float64) int {
 		ii := int(5*y + 100)
 		return ii
 	}
 
-	sir := &SIR{
-		Data:   rdp,
-		Slicer: f,
-	}
-
-	sir.NDir = 2
-	sir.Init()
+	sir := NewSIR(dp, "y", f).NDir(2).Done()
 
 	// Check that the marginal covariance is approximately AR(0.6)
 	dm := new(mat.Dense)
@@ -206,7 +192,7 @@ func TestSIR2(t *testing.T) {
 	}
 }
 
-func gendat3(chunksize int) (dstream.Dstream, dstream.Reg) {
+func gendat3(chunksize int) dstream.Dstream {
 
 	n := 10000
 	p := 5
@@ -215,15 +201,12 @@ func gendat3(chunksize int) (dstream.Dstream, dstream.Reg) {
 	da := make([][]float64, p+1)
 
 	// Noise
-	for j := 0; j < p+1; j++ {
-		if j == 0 {
-			for i := 0; i < n; i++ {
-				da[j] = append(da[j], rand.NormFloat64())
-			}
-		} else {
-			for i := 0; i < n; i++ {
-				da[j] = append(da[j], r*da[j-1][i]+rc*rand.NormFloat64())
-			}
+	for i := 0; i < n; i++ {
+		da[0] = append(da[0], rand.NormFloat64())
+	}
+	for j := 1; j < p+1; j++ {
+		for i := 0; i < n; i++ {
+			da[j] = append(da[j], r*da[j-1][i]+rc*rand.NormFloat64())
 		}
 		if j == p {
 			// Final direction will be dropped in projection
@@ -241,38 +224,32 @@ func gendat3(chunksize int) (dstream.Dstream, dstream.Reg) {
 		}
 	}
 
-	var ida [][]interface{}
-	for _, x := range da {
-		ida = append(ida, []interface{}{x})
-	}
+	// Variable names
 	na := []string{"y"}
 	for j := 0; j < p; j++ {
 		na = append(na, fmt.Sprintf("x%d", j+1))
 	}
+
+	var ida [][]interface{}
+	for _, x := range da {
+		ida = append(ida, []interface{}{x})
+	}
 	dp := dstream.NewFromArrays(ida, na)
 	dp = dstream.MaxChunkSize(dp, chunksize)
-	rdp := dstream.NewReg(dp, "y", na[1:6], "", "")
 
-	return dp, rdp
+	return dp
 }
 
 func TestSIR3(t *testing.T) {
 
-	_, rdp := gendat3(1000)
+	dp := gendat3(1000)
 
 	f := func(y float64) int {
 		ii := int(5*y + 100)
 		return ii
 	}
 
-	sir := &SIR{
-		Data:   rdp,
-		Slicer: f,
-		NDir:   2,
-	}
-
-	sir.SetLogFile("tt")
-	sir.Init()
+	sir := NewSIR(dp, "y", f).SetLogFile("tt").Done()
 	sir.ProjectEigen(4)
 	sir.Fit()
 }
