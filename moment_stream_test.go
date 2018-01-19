@@ -77,8 +77,7 @@ func TestCM1(t *testing.T) {
 
 	da := cmdat1(20)
 
-	cm := newChunkMoment(da, "y")
-	cm.walk()
+	cm := NewMomentStream(da, "y").Done()
 
 	if cm.ny[0] != 69 || cm.ny[1] != 31 {
 		t.Fail()

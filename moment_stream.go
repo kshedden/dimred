@@ -10,7 +10,7 @@ import (
 	"github.com/kshedden/dstream/dstream"
 )
 
-// chunkMoment calculates first and second moments (means and
+// MomentStream calculates first and second moments (means and
 // covariances) for multivariate streaming data, stratifying by a
 // grouping variable.
 //
@@ -19,7 +19,7 @@ import (
 // (where p is the ambient dimension) is saved for each data chunk.
 // So if there are m data chunks, m*p memory is used in addition to
 // the memory storing the values of interest.
-type chunkMoment struct {
+type MomentStream struct {
 
 	// The data used to perform the analysis
 	Data dstream.Dstream
@@ -64,7 +64,7 @@ type chunkMoment struct {
 	log *log.Logger
 }
 
-func newChunkMoment(data dstream.Dstream, yname string) *chunkMoment {
+func NewMomentStream(data dstream.Dstream, yname string) *MomentStream {
 
 	ypos := -1
 	for j, na := range data.Names() {
@@ -84,7 +84,7 @@ func newChunkMoment(data dstream.Dstream, yname string) *chunkMoment {
 		}
 	}
 
-	cm := &chunkMoment{
+	cm := &MomentStream{
 		ypos: ypos,
 		xpos: xpos,
 		Data: data,
@@ -93,27 +93,27 @@ func newChunkMoment(data dstream.Dstream, yname string) *chunkMoment {
 	return cm
 }
 
-func (cm *chunkMoment) MargCov() []float64 {
+func (cm *MomentStream) MargCov() []float64 {
 	return cm.margcov
 }
 
-func (cm *chunkMoment) MargMean() []float64 {
+func (cm *MomentStream) MargMean() []float64 {
 	return cm.margmean
 }
 
-func (cm *chunkMoment) YCov(y int) []float64 {
+func (cm *MomentStream) YCov(y int) []float64 {
 	return cm.cov[y]
 
 }
 
-func (cm *chunkMoment) YMean(y int) []float64 {
+func (cm *MomentStream) YMean(y int) []float64 {
 	return cm.mean[y]
 }
 
 // setProjection uses the dominant eigenvectors of the marginal
 // covariance matrix to project all calculated moments to a reduced
 // space.
-func (cm *chunkMoment) doProjection(ndim int) {
+func (cm *MomentStream) doProjection(ndim int) {
 
 	// Restores the original full covariances.
 	if ndim == 0 {
@@ -161,7 +161,7 @@ func zeroStack(x [][]float64) [][]float64 {
 
 // addBetweenCov adds the covariance of between-chunk means to the
 // current value of cov. Everything is stratified by y level.
-func (cm *chunkMoment) addBetweenCov() {
+func (cm *MomentStream) addBetweenCov() {
 
 	p := cm.Data.NumVar() - 1
 	pp := p * p
@@ -197,7 +197,7 @@ func (cm *chunkMoment) addBetweenCov() {
 // chunkMean calculates the means of the current chunk's data,
 // stratifying by y-level.  The sample sizes per y-level are also
 // calculated and returned.
-func (cm *chunkMoment) chunkMean() ([][]float64, []int) {
+func (cm *MomentStream) chunkMean() ([][]float64, []int) {
 
 	p := cm.Data.NumVar() - 1
 	y := cm.Data.GetPos(cm.ypos).([]float64)
@@ -248,7 +248,7 @@ func growi(ar []int, y int) []int {
 // chunkCov calculates the covariances of the current chunk's data,
 // stratifying by y-level.  The provided storage is used, and grown if
 // needed.
-func (cm *chunkMoment) chunkCov(cov [][]float64, mn [][]float64, ny []int) [][]float64 {
+func (cm *MomentStream) chunkCov(cov [][]float64, mn [][]float64, ny []int) [][]float64 {
 
 	p := cm.Data.NumVar() - 1
 	pp := p * p
@@ -282,7 +282,7 @@ func (cm *chunkMoment) chunkCov(cov [][]float64, mn [][]float64, ny []int) [][]f
 
 // Dim returns the dimension of the problem (the number of variables
 // in all means and covariances).
-func (cm *chunkMoment) Dim() int {
+func (cm *MomentStream) Dim() int {
 	if cm.projDim == 0 {
 		return cm.Data.NumVar() - 1
 	}
@@ -292,7 +292,7 @@ func (cm *chunkMoment) Dim() int {
 // conjugate takes an input matrix mat, and returns its conjugation B'
 // * mat * B by the projection basis B.  mat must be p x p, where p is
 // the number of variables.
-func (cm *chunkMoment) conjugate(ma []float64) []float64 {
+func (cm *MomentStream) conjugate(ma []float64) []float64 {
 	q := cm.Data.NumVar() - 1 // Original dimension
 	p := cm.projDim           // New dimension
 
@@ -311,7 +311,7 @@ func (cm *chunkMoment) conjugate(ma []float64) []float64 {
 // project takes an input vector vec, and returns its projection B' *
 // vec by the projection basis B.  The length of vec must be p, where
 // p is the number of variables.
-func (cm *chunkMoment) project(vec []float64) []float64 {
+func (cm *MomentStream) project(vec []float64) []float64 {
 
 	q := cm.Data.NumVar() - 1 // Original dimension
 	p := cm.projDim           // New dimension
@@ -328,7 +328,7 @@ func (cm *chunkMoment) project(vec []float64) []float64 {
 
 // invproject inverts the stored projection, mapping the vector vec
 // back to the original coordinate system.
-func (cm *chunkMoment) invproject(vec []float64) []float64 {
+func (cm *MomentStream) invproject(vec []float64) []float64 {
 
 	q := cm.Data.NumVar() - 1 // Original dimension
 	p := cm.projDim           // New dimension
@@ -342,7 +342,7 @@ func (cm *chunkMoment) invproject(vec []float64) []float64 {
 
 // GetMean returns the conditional mean for y=i.  If a projection has
 // been set, the projected conditional mean is returned.
-func (cm *chunkMoment) GetMean(i int) []float64 {
+func (cm *MomentStream) GetMean(i int) []float64 {
 
 	if cm.projDim == 0 {
 		return cm.mean[i]
@@ -353,7 +353,7 @@ func (cm *chunkMoment) GetMean(i int) []float64 {
 
 // GetCov returns the conditional covariance for y=i.  If a projection
 // has been set, the projected conditional covariance is returned.
-func (cm *chunkMoment) GetCov(i int) []float64 {
+func (cm *MomentStream) GetCov(i int) []float64 {
 
 	if cm.projDim == 0 {
 		return cm.cov[i]
@@ -364,7 +364,7 @@ func (cm *chunkMoment) GetCov(i int) []float64 {
 
 // Returns the marginal mean, possibly projected if a projection
 // has been set.
-func (cm *chunkMoment) GetMargMean() []float64 {
+func (cm *MomentStream) GetMargMean() []float64 {
 
 	if cm.projDim == 0 {
 		return cm.margmean
@@ -375,7 +375,7 @@ func (cm *chunkMoment) GetMargMean() []float64 {
 
 // Returns the marginal covariance, possibly projected if a projection
 // has been set.
-func (cm *chunkMoment) GetMargCov() []float64 {
+func (cm *MomentStream) GetMargCov() []float64 {
 
 	if cm.projDim == 0 {
 		return cm.margcov
@@ -384,9 +384,9 @@ func (cm *chunkMoment) GetMargCov() []float64 {
 	return cm.conjugate(cm.margcov)
 }
 
-// walk cycles through the data and calculates chunk-wise summary
-// statistics (mean and covariance by y level).
-func (cm *chunkMoment) walk() {
+// Done runs the MomentStream, cycling through the data to calculate
+// chunk-wise summary statistics (mean and covariance by y level).
+func (cm *MomentStream) Done() *MomentStream {
 
 	// Clear everything
 	cm.Data.Reset()
@@ -468,11 +468,13 @@ func (cm *chunkMoment) walk() {
 			cm.log.Printf("%d %v", j, v)
 		}
 	}
+
+	return cm
 }
 
 // calcMargMean sets the margmean field, by collapsing over the y
 // levels to get the marginal mean.
-func (cm *chunkMoment) calcMargMean() {
+func (cm *MomentStream) calcMargMean() {
 
 	p := cm.Data.NumVar() - 1
 	margmean := make([]float64, p)
@@ -493,7 +495,7 @@ func (cm *chunkMoment) calcMargMean() {
 
 // calcMargCov sets the margcov field, by collapsing over the y levels
 // to get the marginal covariance matrix.
-func (cm *chunkMoment) calcMargCov() {
+func (cm *MomentStream) calcMargCov() {
 
 	if cm.margmean == nil {
 		cm.calcMargMean()

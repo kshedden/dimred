@@ -13,7 +13,7 @@ import (
 )
 
 type DOC struct {
-	*chunkMoment
+	*MomentStream
 
 	// Name of the binary response variable
 	responseVarName string
@@ -77,14 +77,14 @@ func (doc *DOC) Eig() []float64 {
 func NewDOC(data dstream.Dstream, response string) *DOC {
 
 	d := &DOC{
-		chunkMoment: newChunkMoment(data, response),
+		MomentStream: NewMomentStream(data, response),
 	}
 
 	return d
 }
 
 func (doc *DOC) Done() *DOC {
-	doc.walk()
+	doc.MomentStream.Done()
 	doc.calcMargMean()
 	doc.calcMargCov()
 	return doc
