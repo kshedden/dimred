@@ -68,7 +68,7 @@ func cmdat1(chunksize int) dstream.Dstream {
 
 	// Restructure the segments
 	dp = dstream.Segment(dp, []string{"seg"})
-	dp = dstream.DropCols(dp, []string{"seg"})
+	dp = dstream.DropCols(dp, "seg")
 
 	return dp
 }
