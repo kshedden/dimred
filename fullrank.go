@@ -1,6 +1,7 @@
 package dimred
 
 import (
+	"fmt"
 	"math"
 	"sort"
 
@@ -18,7 +19,7 @@ func NewFullRank(data dstream.Dstream) *FullRank {
 	}
 }
 
-// FullRank eliminates linear dependencies among columns in a dstream.  A rank-revealing
+// FullRank identifies a maximal set of linearly independent columns in a dstream.  A rank-revealing
 // Cholesky decomposition of the Gram matrix is used to do this.
 type FullRank struct {
 
@@ -31,7 +32,7 @@ type FullRank struct {
 	// The output dstream
 	rdata dstream.Dstream
 
-	// Variables that we will keep regardless (ignore in the check for linear dependence).
+	// Variables that we will keep regardless (ignore these in the check for linear dependence).
 	keep    []string
 	keeppos []int
 
@@ -48,7 +49,12 @@ func (fr *FullRank) init() {
 
 	km := make(map[string]bool)
 	for _, s := range fr.keep {
-		fr.keeppos = append(fr.keeppos, vpos[s])
+		ii, ok := vpos[s]
+		if !ok {
+			msg := fmt.Sprintf("Variable '%s' specified in FullRank.Keep is not in the dstream.", s)
+			panic(msg)
+		}
+		fr.keeppos = append(fr.keeppos, ii)
 		km[s] = true
 	}
 
@@ -62,14 +68,14 @@ func (fr *FullRank) init() {
 // getcpr calculates the cross product matrix of the variables being checked.
 func (fr *FullRank) getcpr() {
 
-	p := len(fr.keeppos)
+	p := len(fr.checkpos)
 	cpr := make([]float64, p*p)
 
 	fr.data.Reset()
 	for fr.data.Next() {
 		vars := make([][]float64, p)
 
-		for j, k := range fr.keeppos {
+		for j, k := range fr.checkpos {
 			vars[j] = fr.data.GetPos(k).([]float64)
 		}
 
@@ -93,7 +99,7 @@ func (fr *FullRank) Done() *FullRank {
 	fr.init()
 	fr.getcpr()
 
-	p := len(fr.keeppos)
+	p := len(fr.checkpos)
 	pos, _ := frank(fr.cpr, p, 1e-6)
 
 	rpos := make(map[int]bool)
@@ -107,13 +113,13 @@ func (fr *FullRank) Done() *FullRank {
 
 	var drop []string
 	names := fr.data.Names()
-	for k := range rpos {
+	for k := range names {
 		if !rpos[k] {
 			drop = append(drop, names[k])
 		}
 	}
 
-	fr.rdata = dstream.DropCols(fr.data, names...)
+	fr.rdata = dstream.DropCols(fr.data, drop...)
 
 	return fr
 }
@@ -125,7 +131,7 @@ func (fr *FullRank) Data() dstream.Dstream {
 
 // Keep specifies variables that are not considered in the linear
 // independence assessment.
-func (fr *FullRank) Keep(vars []string) *FullRank {
+func (fr *FullRank) Keep(vars ...string) *FullRank {
 
 	fr.keep = vars
 	return fr
@@ -152,8 +158,8 @@ func frank(a []float64, n int, tol float64) ([]int, []float64) {
 
 	err := 0.0
 	for i := 0; i < n; i++ {
-		if d[i] < -1e-6 {
-			panic("negative..\n")
+		if d[i] < -1e-10 {
+			panic("negative diagonal value encountered in frank\n")
 		}
 		err += d[i]
 	}
@@ -163,6 +169,7 @@ func frank(a []float64, n int, tol float64) ([]int, []float64) {
 	m := 0
 	for err > tol {
 
+		// Find the largest remaining diagonal value and pivot it to the front.
 		dm := d[perm[m]]
 		i := m
 		for j := m + 1; j < n; j++ {
@@ -172,7 +179,6 @@ func frank(a []float64, n int, tol float64) ([]int, []float64) {
 				i = j
 			}
 		}
-
 		perm[m], perm[i] = perm[i], perm[m]
 
 		ell[m*n+perm[m]] = math.Sqrt(d[perm[m]])
@@ -203,19 +209,3 @@ func frank(a []float64, n int, tol float64) ([]int, []float64) {
 
 	return perm[0:m], ell[0 : m*n]
 }
-
-/*
-	fmt.Printf("perm=%v\n", perm)
-	fmt.Printf("m=%d\n", m)
-
-	for i := 0; i < n; i++ {
-		for j := 0; j < n; j++ {
-			lcp := 0.0
-			for k := 0; k < m; k++ {
-				lcp += ell[k*n+i] * ell[k*n+j] //??
-			}
-			fmt.Printf("%f %f\n", lcp, a[i*n+j])
-		}
-	}
-}
-*/

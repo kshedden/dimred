@@ -5,9 +5,12 @@ import (
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/kshedden/dstream/dstream"
 )
 
-// genred generates a mxn matrix in which columns k, k+1 are identical.
+// genred generates a mxn matrix in which columns k1, k1+1 are identical and
+// k2, k2+1 are identical..
 func genred(m, n, k1, k2 int) []float64 {
 
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -19,11 +22,11 @@ func genred(m, n, k1, k2 int) []float64 {
 	}
 
 	for i := 0; i < m; i++ {
-		a[i*n+k1+1] = a[i*n+k1]
+		a[i*n+k1+1] = 2 * a[i*n+k1]
 	}
 
 	for i := 0; i < m; i++ {
-		a[i*n+k2+1] = a[i*n+k2]
+		a[i*n+k2+1] = 2 * a[i*n+k2]
 	}
 	return a
 }
@@ -79,5 +82,43 @@ func TestFrank1(t *testing.T) {
 
 	if vpos[1] && vpos[2] {
 		t.Fail()
+	}
+}
+
+func TestFullRank1(t *testing.T) {
+
+	x1 := []interface{}{
+		[]float64{0, 0, 0},
+		[]float64{1, 1, 1},
+		[]float64{2, 2, 3},
+	}
+	x2 := []interface{}{
+		[]float64{1, 1, 1},
+		[]float64{1, 1, 1},
+		[]float64{1, 1, 1},
+	}
+	x3 := []interface{}{
+		[]float64{0, 0, 0},
+		[]float64{2, 2, 2},
+		[]float64{4, 4, 6},
+	}
+	x4 := []interface{}{
+		[]float64{0, 0, 0},
+		[]float64{1, 1, 1},
+		[]float64{2, 2, 3},
+	}
+	dat := [][]interface{}{x1, x2, x3, x4}
+	na := []string{"x1", "x2", "x3", "x4"}
+	da := dstream.NewFromArrays(dat, na)
+
+	fr := NewFullRank(da).Keep("x4").Done()
+	rd := fr.Data()
+
+	enames := []string{"x2", "x3", "x4"}
+
+	for i := range enames {
+		if enames[i] != rd.Names()[i] {
+			t.Fail()
+		}
 	}
 }
