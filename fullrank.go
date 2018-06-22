@@ -136,25 +136,31 @@ func (fr *FullRank) Keep(vars ...string) *FullRank {
 	return fr
 }
 
-// fr returns the positions of a maximal subset of rows/columns of the symmetric
-// nxn matrix a that are linearly independent.
+// fr identifies a maximal subset of rows/columns of the symmetric and positive semi-definite
+// nxn matrix 'a' that are linearly independent, and returns a Cholesky factorization for a'.
+// The first returned value 'pos' is a maximal array of positions such that a[pos, pos] is a
+// symmetric and positive definite matrix.  The second returned matrix 'L' is a m x n matrix,
+// where m is the length of 'pos' and n is the number of rows/columns of the input matrix 'a',
+// such that a is equal to L' * L.
 func frank(a []float64, n int, tol float64) ([]int, []float64) {
 
-	// Page 7:
-	// Note that the update for d is wrong
+	// Calculations are based on page 7 of the document linked below.
+	// Note that the update for d is wrong on the slide (it is corrected below).
 	// http://www.mathe.tu-freiberg.de/naspde2010/sites/default/files/harbrecht.pdf
 
-	// Permutation
+	// Initial permutation (identity)
 	perm := make([]int, n)
 	for i := range perm {
 		perm[i] = i
 	}
 
+	// Initial state of the diagonal of a.
 	d := make([]float64, n)
 	for i := 0; i < n; i++ {
 		d[i] = a[i*n+i]
 	}
 
+	// Error level for the starting factorization.
 	err := 0.0
 	for i := 0; i < n; i++ {
 		if d[i] < -1e-10 {
@@ -163,6 +169,9 @@ func frank(a []float64, n int, tol float64) ([]int, []float64) {
 		err += d[i]
 	}
 
+	// The factorization is ell' * ell.  Only the first m rows if ell are
+	// returned, but we don't know the value of m yet, so we allocate for the
+	// worst case.
 	ell := make([]float64, n*n)
 
 	m := 0
@@ -180,8 +189,8 @@ func frank(a []float64, n int, tol float64) ([]int, []float64) {
 		}
 		perm[m], perm[i] = perm[i], perm[m]
 
+		// Update the Cholesky factor and the diagonal of the residual.
 		ell[m*n+perm[m]] = math.Sqrt(d[perm[m]])
-
 		for i := m + 1; i < n; i++ {
 			u := 0.0
 			for j := 0; j < m; j++ {
@@ -192,6 +201,7 @@ func frank(a []float64, n int, tol float64) ([]int, []float64) {
 			d[perm[i]] -= ell[m*n+perm[i]] * ell[m*n+perm[i]]
 		}
 
+		// Calculate the error for the current factorization.
 		err = 0
 		for i := m + 1; i < n; i++ {
 			if d[perm[i]] < -1e-6 {
@@ -202,8 +212,6 @@ func frank(a []float64, n int, tol float64) ([]int, []float64) {
 
 		m++
 	}
-
-	perm = perm[0:m]
 
 	return perm[0:m], ell[0 : m*n]
 }
