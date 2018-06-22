@@ -9,8 +9,8 @@ import (
 	"github.com/kshedden/dstream/dstream"
 )
 
-// genred generates a mxn matrix in which columns k1, k1+1 are identical and
-// k2, k2+1 are identical..
+// genred generates a mxn matrix in which columns k1, k1+1 are proportional and
+// k2, k2+1 are proportional.  The rank of the resulting matrix is n-2..
 func genred(m, n, k1, k2 int) []float64 {
 
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -31,6 +31,7 @@ func genred(m, n, k1, k2 int) []float64 {
 	return a
 }
 
+// cprod returns the nxn Gram matrix of the given mxn matrix.
 func cprod(a []float64, m, n int) []float64 {
 
 	b := make([]float64, n*n)
@@ -115,7 +116,16 @@ func TestFullRank1(t *testing.T) {
 	rd := fr.Data()
 
 	enames := []string{"x2", "x3", "x4"}
+	for i := range enames {
+		if enames[i] != rd.Names()[i] {
+			t.Fail()
+		}
+	}
 
+	fr = NewFullRank(da).Done()
+	rd = fr.Data()
+
+	enames = []string{"x2", "x3"}
 	for i := range enames {
 		if enames[i] != rd.Names()[i] {
 			t.Fail()

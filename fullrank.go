@@ -9,8 +9,8 @@ import (
 	"github.com/kshedden/dstream/dstream"
 )
 
-// NewFullRank returns a FullRank struct for the given dstream.  All columns
-// not specified in a call to Keep must have float64 type.
+// NewFullRank returns an allocated FullRank value for the given dstream.
+// All columns not specified in a call to Keep must have float64 type.
 func NewFullRank(data dstream.Dstream) *FullRank {
 
 	return &FullRank{
@@ -18,8 +18,8 @@ func NewFullRank(data dstream.Dstream) *FullRank {
 	}
 }
 
-// FullRank identifies a maximal set of linearly independent columns in a dstream.  A rank-revealing
-// Cholesky decomposition of the Gram matrix is used to do this.
+// FullRank identifies a maximal set of linearly independent columns in a dstream.
+// A rank-revealing Cholesky decomposition of the Gram matrix is used to do this.
 type FullRank struct {
 
 	// The Gram matrix of the columns being assessed for linear dependence
