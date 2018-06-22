@@ -3,7 +3,6 @@ package dimred
 import (
 	"fmt"
 	"math"
-	"sort"
 
 	"gonum.org/v1/gonum/floats"
 
@@ -205,7 +204,6 @@ func frank(a []float64, n int, tol float64) ([]int, []float64) {
 	}
 
 	perm = perm[0:m]
-	sort.Sort(sort.IntSlice(perm))
 
 	return perm[0:m], ell[0 : m*n]
 }
