@@ -57,7 +57,7 @@ func TestFrank1(t *testing.T) {
 	a := genred(n, p, 1, 3)
 	b := cprod(a, n, p)
 
-	pos, ell := frank(b, p, 1e-6)
+	pos, ell, _ := frank(b, p, 1e-6)
 
 	m := len(pos)
 	for j := 0; j < p; j++ {

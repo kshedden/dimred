@@ -2,11 +2,18 @@ package dimred
 
 import (
 	"fmt"
+	"log"
 	"math"
+	"os"
+	"strings"
 
 	"gonum.org/v1/gonum/floats"
 
 	"github.com/kshedden/dstream/dstream"
+)
+
+const (
+	defaultFullRankTol float64 = 1e-6
 )
 
 // NewFullRank returns an allocated FullRank value for the given dstream.
@@ -18,8 +25,8 @@ func NewFullRank(data dstream.Dstream) *FullRank {
 	}
 }
 
-// FullRank identifies a maximal set of linearly independent columns in a dstream.
-// A rank-revealing Cholesky decomposition of the Gram matrix is used to do this.
+// FullRank identifies a maximal set of linearly independent columns in a dstream,
+// using a rank-revealing Cholesky decomposition.
 type FullRank struct {
 
 	// The Gram matrix of the columns being assessed for linear dependence
@@ -31,9 +38,15 @@ type FullRank struct {
 	// The output dstream
 	rdata dstream.Dstream
 
+	// The tolerance parameter for dropping terms.
+	tol float64
+
 	// Variables that we will keep regardless (ignore these in the check for linear dependence).
 	keep    []string
 	keeppos []int
+
+	// A logger, not used if nil
+	log *log.Logger
 
 	// Positions to consider in the check for linear dependence (everything not in keeppos).
 	checkpos []int
@@ -92,14 +105,50 @@ func (fr *FullRank) getcpr() {
 	fr.cpr = cpr
 }
 
+// Tol sets the tolerance parameter for dropping columns that are nearly
+// linearly dependent with the other columns.
+func (fr *FullRank) Tol(tol float64) *FullRank {
+	fr.tol = tol
+	return fr
+}
+
+// LogFile specifies the name of a file used for logging.
+func (fr *FullRank) LogFile(filename string) *FullRank {
+	f, err := os.Create(filename)
+	if err != nil {
+		panic(err)
+	}
+	fr.log = log.New(f, "", log.Lshortfile)
+
+	return fr
+}
+
 // Done completes configuration.
 func (fr *FullRank) Done() *FullRank {
+
+	if fr.tol == 0 {
+		fr.tol = defaultFullRankTol
+	}
 
 	fr.init()
 	fr.getcpr()
 
 	p := len(fr.checkpos)
-	pos, _ := frank(fr.cpr, p, 1e-6)
+	pos, _, d := frank(fr.cpr, p, fr.tol)
+
+	if fr.log != nil {
+		var b []string
+		for _, j := range pos {
+			b = append(b, fmt.Sprintf("%f", d[j]))
+		}
+		msg := "Final state of diagonal: " + strings.Join(b, ", ")
+		fr.log.Printf(msg)
+	}
+
+	if fr.log != nil {
+		msg := fmt.Sprintf("Retained %d out of %d variables", len(pos), p)
+		fr.log.Printf(msg)
+	}
 
 	rpos := make(map[int]bool)
 	for _, k := range pos {
@@ -142,7 +191,7 @@ func (fr *FullRank) Keep(vars ...string) *FullRank {
 // symmetric and positive definite matrix.  The second returned matrix 'L' is a m x n matrix,
 // where m is the length of 'pos' and n is the number of rows/columns of the input matrix 'a',
 // such that a is equal to L' * L.
-func frank(a []float64, n int, tol float64) ([]int, []float64) {
+func frank(a []float64, n int, tol float64) ([]int, []float64, []float64) {
 
 	// Calculations are based on page 7 of the document linked below.
 	// Note that the update for d is wrong on the slide (it is corrected below).
@@ -213,5 +262,5 @@ func frank(a []float64, n int, tol float64) ([]int, []float64) {
 		m++
 	}
 
-	return perm[0:m], ell[0 : m*n]
+	return perm[0:m], ell[0 : m*n], d
 }
